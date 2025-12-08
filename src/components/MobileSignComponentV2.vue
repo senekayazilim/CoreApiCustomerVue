@@ -88,7 +88,7 @@ const signatureLevelForPadesOptions = Object.keys(SignatureLevelForPades).filter
 const signatureLevelForCadesOptions = Object.keys(SignatureLevelForCades).filter((key) => isNaN(Number(key))).map((key) => {
     return {
         label: key,
-        value: SignatureLevelForPades[key as keyof typeof SignatureLevelForPades]
+        value: SignatureLevelForCades[key as keyof typeof SignatureLevelForCades]
     };
 });
 
@@ -96,7 +96,7 @@ const signatureLevelForCadesOptions = Object.keys(SignatureLevelForCades).filter
 const signatureLevelForXadesOptions = Object.keys(SignatureLevelForXades).filter((key) => isNaN(Number(key))).map((key) => {
     return {
         label: key,
-        value: SignatureLevelForPades[key as keyof typeof SignatureLevelForPades]
+        value: SignatureLevelForXades[key as keyof typeof SignatureLevelForXades]
     };
 });
 
@@ -273,6 +273,9 @@ function MobileSignV2() {
         selectedIsEnvelopingOrEnvelopedOption.value.id === "ENVELOPING" || selectedIsEnvelopingOrEnvelopedOption.value.id === "ENVELOPED"
             ? selectedIsEnvelopingOrEnvelopedOption.value.id
             : "ENVELOPED";
+
+            console.log("signatureLevelForCades", signatureLevelForCades);
+            console.log("selectedCadesSignatureLevel", selectedCadesSignatureLevel);
 
     const mobileSignRequest = {
         operationId: operationId.value,

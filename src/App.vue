@@ -55,8 +55,8 @@ function selectTab(tab: any) {
                 <div class="border-r border-gray-200">
                     <nav class="-mb-px flex space-y-0 flex-col" aria-label="Tabs">
                         <div v-for="tab in tabs" :key="tab.name" :class="[
-                            tab.name === selectedTab.name ? 'border-indigo-500 text-indigo-600 bg-indigo-50' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 cursor-pointer',
-                            'whitespace-nowrap border-r-2 py-3 pl-3 pr-1 text-sm font-medium',
+                            tab.name === selectedTab.name ? 'border-indigo-500 text-indigo-600 bg-indigo-50' : 'border-transparent hover:bg-indigo-50/50 text-gray-500 hover:border-gray-300 hover:text-gray-700 cursor-pointer',
+                            'whitespace-nowrap border-r-2 py-3 pl-3 pr-3 text-sm font-medium',
                         ]" :aria-current="tab.name === selectedTab.name ? 'page' : undefined" @click="selectTab(tab)">
                             {{ tab.name }}
                         </div>
