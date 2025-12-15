@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { computed, ref } from "@vue/runtime-core";
+import {  ref } from "@vue/runtime-core";
 import axios, { AxiosError } from "axios";
-import { v4 as uuidv4 } from "uuid";
 import { Listbox, ListboxButton, ListboxOption, ListboxOptions, ListboxLabel } from "@headlessui/vue";
 import { CheckIcon, ChevronUpDownIcon } from "@heroicons/vue/20/solid";
-import { DevicePhoneMobileIcon } from "@heroicons/vue/24/outline";
+import { ArrowUpOnSquareIcon } from "@heroicons/vue/24/outline";
 import CardComponent from "./CardComponent.vue";
-import { SignatureLevelForPades, SignatureLevelForCades, type GetFingerPrintRequest, type MobileSignRequestV2, type MobilSignResult, type UploadFileResult, type GetSignatureListResult, type GetSignatureListResultItem, SignatureLevelForXades } from "@/types/Types";
+import { SignatureLevelForPades, type ProxyGetSignatureListResult, type ProxyGetSignatureListResultItem, type ProxyUploadFileResultV2} from "@/types/Types";
 import { HandleError } from "@/types/HandleError";
 import store from "@/types/Store";
 
@@ -15,13 +14,14 @@ const waitString = ref("");
 // yapılan işlemler
 const logs = ref([] as Array<string>);
 // primeAPI'de kullanılacak tekil operasyon numarası
-const operationId = ref("");
+const operationId = ref(null as string | null);
+
 // işlemin başarıyla tamamlanıp tamamlanmadığını gösterir
 const isSuccess = ref(false);
 
 
 // cades imza listesi
-const signatureList = ref([] as Array<GetSignatureListResultItem>);
+const signatureList = ref([] as Array<ProxyGetSignatureListResultItem>);
 // Enum'ı Combo Box için Diziye Çevirme
 const signatureOptions = Object.keys(SignatureLevelForPades).filter((key) => isNaN(Number(key))).map((key) => {
   return {
@@ -60,19 +60,20 @@ async function UploadFileToServer() {
 
   const formData = new FormData();
   formData.append("file", selectedFile.value);
+  formData.append("filename", selectedFile.value.name);
 
   try {
     waitString.value = "Dosya sunucuya yükleniyor.";
     logs.value.push(`Sunucuya dosya yükleme isteği gönderiliyor: ${selectedFile.value.name}`);
-    const response = await axios.post(store.API_URL + "/Onaylarim/UploadFile", formData, {
+    
+    const response = await axios.post(store.API_URL + "/Onaylarim/UploadFileV2", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
-    const uploadResult = response.data as UploadFileResult;
+    const uploadResult = response.data as   ProxyUploadFileResultV2;
     if (uploadResult?.isSuccess) {
       waitString.value = "Dosya sunucuya başarıyla yüklendi.";
       logs.value.push("Dosya sunucuya başarıyla yüklendi.");
       operationId.value = uploadResult.operationId;
-
       signatureList.value = [];
       GetSignatureListPades();
     } else {
@@ -96,11 +97,11 @@ function GetSignatureListPades() {
   logs.value.push("Sizin sunucu katmanına GetSignatureListPades isteği gönderiliyor.");
   // mobil imza işlemi yapılır
   axios
-    .get(store.API_URL + "/Onaylarim/GetSignatureListPades?operationId=" + operationId.value)
+    .get(store.API_URL + "/Onaylarim/GetSignatureListPadesV2?operationId=" + operationId.value)
     .then((getSignatureListResponse) => {
       logs.value.push("Sizin sunucu katmanına GetSignatureListPades isteği gönderildi. Detaylar için console'a bakınız.");
       console.log("Sizin sunucu katmanına GetSignatureListPades isteği gönderildi.", getSignatureListResponse);
-      const getSignatureListResult = getSignatureListResponse.data as GetSignatureListResult;
+      const getSignatureListResult = getSignatureListResponse.data as   ProxyGetSignatureListResult;
       signatureList.value = getSignatureListResult.signatures;
       console.log("getSignatureListResult", getSignatureListResult);
     })
@@ -176,7 +177,7 @@ function UpgradePades() {
   <main class="space-y-4">
     <CardComponent title="Pades Upgrade V2">
       <template v-slot:icon>
-        <DevicePhoneMobileIcon></DevicePhoneMobileIcon>
+        <ArrowUpOnSquareIcon></ArrowUpOnSquareIcon>
       </template>
       <template v-slot:content>
         <div class="flex items-end ">
@@ -319,7 +320,7 @@ function UpgradePades() {
     <div class="pt-4 border-t border-gray-200 text-xs" v-if="logs && logs.length > 0">
       <p class="leading-6 text-sm font-medium">İşlemler</p>
 
-      <p v-for="(logItem, index) in logs" :key="index" class="">{{ logItem }}</p>
+      <p v-for="(logItem, index) in logs.reverse()" :key="index" class=""> {{ logs.length - index }}. {{ logItem }}</p>
     </div>
   </main>
 </template>

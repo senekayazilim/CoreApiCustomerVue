@@ -3,7 +3,7 @@ import { onMounted, ref } from "@vue/runtime-core";
 import axios from "axios";
 import { CpuChipIcon } from "@heroicons/vue/20/solid";
 import { ExclamationTriangleIcon, ComputerDesktopIcon, ArrowDownTrayIcon, ClockIcon, LockClosedIcon, CheckBadgeIcon, Cog6ToothIcon } from "@heroicons/vue/24/outline";
-import { type CreateStateOnOnaylarimApiResult, type FinishSignResult, type CreateStateOnOnaylarimApiRequest } from "../types/Types";
+import { type ProxyCreateStateOnOnaylarimApiResult, type ProxyFinishSignResult, type ProxyCreateStateOnOnaylarimApiRequest } from "../types/Types";
 import { type CertificateInfo, type GetSignerAppVersionsResult, type SignerAppPingResult, type SignerAppResetResult, type SignStepTwoResult, type WebToAvalonSignStepTwoRequest } from "../types/AgentTypes";
 import { HandleError } from "../types/HandleError";
 import CardComponent from "./CardComponent.vue";
@@ -206,7 +206,7 @@ function LocalSignerReset() {
 // imza işlemini gerçekleştiren fonksiyondur
 function Sign(certificate: CertificateInfo) {
   operationId.value = "";
-  const createStateOnOnaylarimApiRequest = { certificate: certificate.data, signatureType: selectedSignatureType.value.id } as CreateStateOnOnaylarimApiRequest;
+  const createStateOnOnaylarimApiRequest = { certificate: certificate.data, signatureType: selectedSignatureType.value.id } as ProxyCreateStateOnOnaylarimApiRequest;
 
   if (useEnvelopingSignature.value === true) {
     createStateOnOnaylarimApiRequest.xmlSignatureType = 2;
@@ -226,7 +226,7 @@ function Sign(certificate: CertificateInfo) {
           "Content-Type": "application/x-www-form-urlencoded",
         },
       };
-      const createStateOnOnaylarimApiResult = createStateOnOnaylarimApiResponse.data as CreateStateOnOnaylarimApiResult;
+      const createStateOnOnaylarimApiResult = createStateOnOnaylarimApiResponse.data as ProxyCreateStateOnOnaylarimApiResult;
       console.log("createStateOnOnaylarimApiResult", createStateOnOnaylarimApiResult);
 
       if (createStateOnOnaylarimApiResult.error !== undefined && createStateOnOnaylarimApiResult.error !== null && createStateOnOnaylarimApiResult.error.length > 0) {
@@ -284,7 +284,7 @@ function Sign(certificate: CertificateInfo) {
                 .then((finishSignResponse) => {
                   logs.value.push("Sizin sunucu katmanına FinishSign isteği gönderildi. Detaylar için console'a bakınız.");
                   console.log("Sizin sunucu katmanına FinishSign isteği gönderildi.", createStateOnOnaylarimApiResponse);
-                  const finishSignResult = finishSignResponse.data as FinishSignResult;
+                  const finishSignResult = finishSignResponse.data as ProxyFinishSignResult;
                   if (finishSignResult.isSuccess) {
                     logs.value.push("Sizin sunucu katmanına FinishSign istiği sonucu: İşlem başarılı.");
                     waitString.value = "İmza işlemi tamamlandı.";

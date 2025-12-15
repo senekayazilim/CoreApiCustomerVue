@@ -6,7 +6,7 @@ import { Listbox, ListboxButton, ListboxOption, ListboxOptions } from "@headless
 import { CheckIcon, ChevronUpDownIcon } from "@heroicons/vue/20/solid";
 import { DevicePhoneMobileIcon } from "@heroicons/vue/24/outline";
 import CardComponent from "./CardComponent.vue";
-import {  SignatureLevelForCades, type GetFingerPrintRequest, type MobileSignRequestV2, type MobilSignResult } from "@/types/Types";
+import {  SignatureLevelForCades, type ProxyGetFingerPrintRequest, type ProxyMobileSignRequestV2, type ProxyMobilSignResult } from "@/types/Types";
 import {  HandleError } from "@/types/HandleError";
 import store from "@/types/Store";
 
@@ -69,7 +69,7 @@ function MobileSign() {
         .then((mobileSignResponse) => {
             logs.value.push("Sizin sunucu katmanına MobileSign isteği gönderildi. Detaylar için console'a bakınız.");
             console.log("Sizin sunucu katmanına MobileSign isteği gönderildi.", mobileSignResponse);
-            const mobileSignResult = mobileSignResponse.data as MobilSignResult;
+            const mobileSignResult = mobileSignResponse.data as ProxyMobilSignResult;
             isSuccess.value = mobileSignResult.isSuccess;
             if (mobileSignResult.error) {
                 waitString.value = "İmza işlemi tamamlanamadı. Hata: " + mobileSignResult.error;
@@ -83,7 +83,7 @@ function MobileSign() {
         });
     // mobil imza işlemi sürerken işleme ilişkin parmak izi değeri alınır
     axios
-        .post(store.API_URL + "/Onaylarim/GetFingerPrint", { operationId: operationId.value } as GetFingerPrintRequest)
+        .post(store.API_URL + "/Onaylarim/GetFingerPrint", { operationId: operationId.value } as ProxyGetFingerPrintRequest)
         .then((getFingerResponse) => {
             console.log("getFingerResponse", getFingerResponse);
             fingerPrint.value = getFingerResponse.data.fingerPrint;

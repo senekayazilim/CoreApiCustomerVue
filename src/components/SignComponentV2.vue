@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import { onMounted, ref } from "@vue/runtime-core";
 import axios, { AxiosError } from "axios";
-import { v4 as uuidv4 } from "uuid";
 import { Listbox, ListboxButton, ListboxOption, ListboxOptions, ListboxLabel } from "@headlessui/vue";
 import { CheckIcon, ChevronUpDownIcon } from "@heroicons/vue/20/solid";
-import { Cog6ToothIcon } from "@heroicons/vue/24/outline";
+import { CpuChipIcon } from "@heroicons/vue/24/outline";
 import { ExclamationTriangleIcon, ComputerDesktopIcon, ArrowDownTrayIcon, LockClosedIcon, CheckBadgeIcon } from "@heroicons/vue/24/outline";
 import CardComponent from "./CardComponent.vue";
-import { SignatureLevelForPades, SignatureLevelForCades, type UploadFileResult, type GetSignatureListResult, type GetSignatureListResultItem, SignatureLevelForXades, type CreateStateOnOnaylarimApiForPadesRequestV2, type CreateStateOnOnaylarimApiResult, type FinishSignForPadesRequestV2, type FinishSignResult } from "@/types/Types";
+import { SignatureLevelForPades, SignatureLevelForCades, type ProxyUploadFileResult, type ProxyGetSignatureListResult, type ProxyGetSignatureListResultItem, SignatureLevelForXades, type ProxyCreateStateOnOnaylarimApiForPadesRequestV2, type ProxyCreateStateOnOnaylarimApiResult, type ProxyFinishSignForPadesRequestV2, type ProxyFinishSignResult, type ProxyCreateStateOnOnaylarimApiForCadesRequestV2, type ProxyFinishSignForCadesRequestV2, type ProxyFinishSignForXadesRequestV2, type ProxyCreateStateOnOnaylarimApiForXadesRequestV2 } from "@/types/Types";
 import { HandleError } from "@/types/HandleError";
 import store from "@/types/Store";
 import type { CertificateInfo, GetSignerAppVersionsResult, SignStepTwoResult, SignerAppPingResult, SignerAppResetResult, WebToAvalonSignStepTwoRequest } from "@/types/AgentTypes";
@@ -17,11 +16,17 @@ const waitString = ref("");
 // yapılan işlemler
 const logs = ref([] as Array<string>);
 // primeAPI'de kullanılacak tekil operasyon numarası
-const operationId = ref("");
+//const operationId = ref("");
+
+// primeAPI'de kullanılacak tekil operasyon numarası
+const operationIdOfFileUpload = ref("");
+const operationIdOfSignStepOne = ref("");
+const operationIdOfFinishSign = ref("");
+
 // işlemin başarıyla tamamlanıp tamamlanmadığını gösterir
 const isSuccess = ref(false);
-// cades imza listesi
-const signatureList = ref(null as Array<GetSignatureListResultItem> | null);
+// imza listesi
+const signatureList = ref(undefined as Array<ProxyGetSignatureListResultItem> | null | undefined);
 // e-imza aracı durumu
 const localSignerMode = ref("");
 // kullanıcının seçtiği sertifika
@@ -58,6 +63,10 @@ const isEnvelopingOrEnvelopedOptions = [
   { id: "ENVELOPING", title: "Enveloping" }
 ];
 
+const envelopingObjectMimeType = ref("application/pdf");
+
+const envelopingObjectEncoding = ref("http://www.w3.org/2000/09/xmldsig#base64");
+
 const turkishProfileOptions = [
   { id: "NONE", title: "Hiçbiri", value: null, disabled: false },
   { id: "P1", title: "P1", value: "P1", disabled: true },
@@ -88,7 +97,7 @@ const signatureLevelForPadesOptions = Object.keys(SignatureLevelForPades).filter
 const signatureLevelForCadesOptions = Object.keys(SignatureLevelForCades).filter((key) => isNaN(Number(key))).map((key) => {
   return {
     label: key,
-    value: SignatureLevelForPades[key as keyof typeof SignatureLevelForPades]
+    value: SignatureLevelForCades[key as keyof typeof SignatureLevelForCades]
   };
 });
 
@@ -96,9 +105,11 @@ const signatureLevelForCadesOptions = Object.keys(SignatureLevelForCades).filter
 const signatureLevelForXadesOptions = Object.keys(SignatureLevelForXades).filter((key) => isNaN(Number(key))).map((key) => {
   return {
     label: key,
-    value: SignatureLevelForPades[key as keyof typeof SignatureLevelForPades]
+    value: SignatureLevelForXades[key as keyof typeof SignatureLevelForXades]
   };
 });
+
+
 
 const selectedPadesSignatureLevel = ref(signatureLevelForPadesOptions[0]);
 const selectedCadesSignatureLevel = ref(signatureLevelForCadesOptions[0]);
@@ -194,7 +205,7 @@ async function LocalSignerPing(useHttps: boolean, useLocalhost: boolean): Promis
 // e-İmza aracına bağlanıp varsa takılı sertifikalar alınır
 function LocalSignerReset() {
   signerAppResetResult.value = null;
-  operationId.value = "";
+
   localSignerMode.value = "working";
   waitString.value = "";
   // reset fonkisyonu ile e-İmza aracına bağlanıp varsa takılı sertifikalar alınır. e-imza aracı reset fonksiyonu ile takılı sertifiları baştan aramaya başlar.
@@ -289,22 +300,29 @@ async function UploadFileToServer() {
     return;
   }
 
+  operationIdOfFileUpload.value = "";
+  operationIdOfFinishSign.value = "";
+  operationIdOfSignStepOne.value = "";
+
   const formData = new FormData();
   formData.append("file", selectedFile.value);
+  formData.append("filename", selectedFile.value.name);
 
   try {
     waitString.value = "Dosya sunucuya yükleniyor.";
     logs.value.push(`Sunucuya dosya yükleme isteği gönderiliyor: ${selectedFile.value.name}`);
-    const response = await axios.post(store.API_URL + "/Onaylarim/UploadFile", formData, {
+    const response = await axios.post(store.API_URL + "/Onaylarim/UploadFileV2", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
-    const uploadResult = response.data as UploadFileResult;
+
+
+    const uploadResult = response.data as ProxyUploadFileResult;
     if (uploadResult?.isSuccess) {
       waitString.value = "Dosya sunucuya başarıyla yüklendi.";
       logs.value.push("Dosya sunucuya başarıyla yüklendi.");
-      operationId.value = uploadResult.operationId;
-      console.log("selectedSignatureType.value", selectedSignatureType.value);
-      signatureList.value = null;
+      operationIdOfFileUpload.value = uploadResult.operationId;
+
+      signatureList.value = undefined;
       if (selectedSignatureType.value.id === "cades") {
         GetSignatureListCades();
       }
@@ -328,17 +346,24 @@ async function UploadFileToServer() {
   }
 }
 
+
 // imza işlemini gerçekleştiren fonksiyondur
 function Sign(certificate: CertificateInfo) {
   if (selectedSignatureType.value.id === "pades") {
     SignPadesV2(certificate);
   }
+  else if (selectedSignatureType.value.id === "cades") {
+    SignCadesV2(certificate);
+  }
+  else if (selectedSignatureType.value.id === "xades") {
+    SignXadesV2(certificate);
+  }
 }
 
 // Pades imza işlemini gerçekleştiren fonksiyondur
 function SignPadesV2(certificate: CertificateInfo) {
-  operationId.value = "";
-  const createStateOnOnaylarimApiForPadesRequestV2 = { certificate: certificate.data, signatureLevel: selectedPadesSignatureLevel.value.value } as CreateStateOnOnaylarimApiForPadesRequestV2;
+
+  const createStateOnOnaylarimApiForPadesRequestV2 = { certificate: certificate.data, operationId: operationIdOfFileUpload.value } as ProxyCreateStateOnOnaylarimApiForPadesRequestV2;
 
 
 
@@ -356,13 +381,15 @@ function SignPadesV2(certificate: CertificateInfo) {
           "Content-Type": "application/x-www-form-urlencoded",
         },
       };
-      const createStateOnOnaylarimApiResult = createStateOnOnaylarimApiForPadesResponse.data as CreateStateOnOnaylarimApiResult;
+      const createStateOnOnaylarimApiResult = createStateOnOnaylarimApiForPadesResponse.data as ProxyCreateStateOnOnaylarimApiResult;
       console.log("createStateOnOnaylarimApiResult", createStateOnOnaylarimApiResult);
 
       if (createStateOnOnaylarimApiResult.error !== undefined && createStateOnOnaylarimApiResult.error !== null && createStateOnOnaylarimApiResult.error.length > 0) {
         logs.value.push("Sizin sunucu katmanına CreateStateOnOnaylarimApiForPadesV2 isteği hata döndü. Hata: " + createStateOnOnaylarimApiResult.error);
         return;
       }
+      operationIdOfSignStepOne.value = createStateOnOnaylarimApiResult.operationId;
+
       const signStepTwoRequest = {
         keyId: createStateOnOnaylarimApiResult.keyID,
         keySecret: createStateOnOnaylarimApiResult.keySecret,
@@ -400,24 +427,26 @@ function SignPadesV2(certificate: CertificateInfo) {
             } else {
               logs.value.push("e-İmza aracına SIGNSTEPTWO isteği başarıyla tamamlandı.");
               // e-imza son adım çalıştırılır. 2. adımda imzalanan veri API'ye gönderilir
-              const  finishSignForPadesRequestV2 = {
+              const finishSignForPadesRequestV2 = {
                 keyId: createStateOnOnaylarimApiResult.keyID,
                 keySecret: createStateOnOnaylarimApiResult.keySecret,
                 signedData: signStepTwoResult.signedData,
-                operationId: createStateOnOnaylarimApiResult.operationId,
+                operationId: operationIdOfSignStepOne.value,
                 signatureLevel: selectedPadesSignatureLevel.value.value,
-              } as FinishSignForPadesRequestV2;
+              } as ProxyFinishSignForPadesRequestV2;
               logs.value.push("Sizin sunucu katmanına FinishSign isteği gönderiliyor.");
               axios
                 .post(store.API_URL + "/Onaylarim/FinishSignForPadesV2", finishSignForPadesRequestV2)
                 .then((finishSignResponse) => {
                   logs.value.push("Sizin sunucu katmanına FinishSignForPadesV2 isteği gönderildi. Detaylar için console'a bakınız.");
                   console.log("Sizin sunucu katmanına FinishSignForPadesV2 isteği gönderildi.", finishSignResponse);
-                  const finishSignResult = finishSignResponse.data as FinishSignResult;
+                  const finishSignResult = finishSignResponse.data as ProxyFinishSignResult;
                   if (finishSignResult.isSuccess) {
                     logs.value.push("Sizin sunucu katmanına FinishSignForPadesV2 istiği sonucu: İşlem başarılı.");
                     waitString.value = "İmza işlemi tamamlandı.";
-                    operationId.value = createStateOnOnaylarimApiResult.operationId;
+
+                    operationIdOfFinishSign.value = finishSignResult.operationId;
+                    isSuccess.value = true;
                   } else {
                     logs.value.push("Sizin sunucu katmanına FinishSignForPadesV2 istiği sonucu: İşlem başarısız.");
                     waitString.value = "İmza işlemi tamamlanamadı.";
@@ -441,6 +470,256 @@ function SignPadesV2(certificate: CertificateInfo) {
     });
 }
 
+// Cades imza işlemini gerçekleştiren fonksiyondur
+function SignCadesV2(certificate: CertificateInfo) {
+
+  const createStateOnOnaylarimApiForCadesRequestV2 =
+    {
+      certificate: certificate.data,
+      operationId: operationIdOfFileUpload.value,
+
+      serialOrParallel: selectedIsSerialOrParallelOption.value.id,
+      citizenshipNo: null,
+      signatureTurkishProfile: null,
+      signaturePath: signaturePath.value
+    } as ProxyCreateStateOnOnaylarimApiForCadesRequestV2;
+
+
+
+  waitString.value = "İmza işlemi hazırlanıyor.";
+  logs.value.push("Sizin sunucu katmanına CreateStateOnOnaylarimApiForCadesV2 isteği gönderiliyor.");
+  axios
+    .post(store.API_URL + "/Onaylarim/CreateStateOnOnaylarimApiForCadesV2", createStateOnOnaylarimApiForCadesRequestV2)
+    .then((createStateOnOnaylarimApiForCadesResponse) => {
+      logs.value.push("Sizin sunucu katmanına CreateStateOnOnaylarimApiForCadesV2 isteği gönderildi. Detaylar için console'a bakınız.");
+      console.log("Sizin sunucu katmanına CreateStateOnOnaylarimApiForCadesV2 isteği gönderildi.", createStateOnOnaylarimApiForCadesResponse);
+
+      waitString.value = "İmza işlemi baştıldı.";
+      const config = {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      };
+      const createStateOnOnaylarimApiResult = createStateOnOnaylarimApiForCadesResponse.data as ProxyCreateStateOnOnaylarimApiResult;
+      console.log("createStateOnOnaylarimApiResult", createStateOnOnaylarimApiResult);
+
+
+
+      if (createStateOnOnaylarimApiResult.error !== undefined && createStateOnOnaylarimApiResult.error !== null && createStateOnOnaylarimApiResult.error.length > 0) {
+        logs.value.push("Sizin sunucu katmanına CreateStateOnOnaylarimApiForPadesV2 isteği hata döndü. Hata: " + createStateOnOnaylarimApiResult.error);
+        return;
+      }
+
+      operationIdOfSignStepOne.value = createStateOnOnaylarimApiResult.operationId;
+
+      const signStepTwoRequest = {
+        keyId: createStateOnOnaylarimApiResult.keyID,
+        keySecret: createStateOnOnaylarimApiResult.keySecret,
+        state: createStateOnOnaylarimApiResult.state,
+        pkcsLibrary: certificate.pkcsLibrary,
+        slot: certificate.slot,
+        pin: userPin.value,
+        certificateIndex: certificate.certificateIndex
+      } as WebToAvalonSignStepTwoRequest;
+      // e-imza aracına e-imza atması için istekte bulunulur. Kartta bulunan sertifika ile imzalama işlemi bu adımda yapılır.
+      logs.value.push("e-İmza aracına SIGNSTEPTWO isteği gönderiliyor.");
+      axios
+        .post(workingUrl.value + "/signStepTwo", JSON.stringify(signStepTwoRequest), config)
+        .then((signStepTwoResponse) => {
+          const signStepTwoResult = signStepTwoResponse.data as SignStepTwoResult;
+          if (signStepTwoResult.error !== undefined && signStepTwoResult.error !== null) {
+            if (signStepTwoResult.error.search("INCORRECT_PIN") >= 0) {
+              logs.value.push("e-İmza aracına SIGNSTEPTWO isteği hata döndü. Detaylar için console'a bakınız.");
+              console.log("e-İmza aracına SIGNSTEPTWO isteği sonucu.", signStepTwoResult);
+              waitString.value = "Hata oluştu. " + "e-İmza şifreniz yanlış.";
+            } else if (signStepTwoResult.error.search("PIN_BLOCKED") >= 0) {
+              logs.value.push("e-İmza aracına SIGNSTEPTWO isteği hata döndü. Detaylar için console'a bakınız.");
+              console.log("e-İmza aracına SIGNSTEPTWO isteği sonucu.", signStepTwoResult);
+              waitString.value = "Hata oluştu. " + "e-İmza şifreniz blokeli.";
+            } else {
+              logs.value.push("e-İmza aracına SIGNSTEPTWO isteği hata döndü. Detaylar için console'a bakınız.");
+              console.log("e-İmza aracına SIGNSTEPTWO isteği sonucu.", signStepTwoResult);
+              waitString.value = "Hata oluştu. " + signStepTwoResult.error;
+            }
+          } else {
+            if (signStepTwoResult.error) {
+              logs.value.push("e-İmza aracına SIGNSTEPTWO isteği hata döndü. Detaylar için console'a bakınız.");
+              console.log("e-İmza aracına SIGNSTEPTWO isteği sonucu.", signStepTwoResult);
+              waitString.value = "Hata oluştu. " + signStepTwoResult.error;
+            } else {
+              logs.value.push("e-İmza aracına SIGNSTEPTWO isteği başarıyla tamamlandı.");
+              // e-imza son adım çalıştırılır. 2. adımda imzalanan veri API'ye gönderilir
+              const finishSignForCadesRequestV2 = {
+                keyId: createStateOnOnaylarimApiResult.keyID,
+                keySecret: createStateOnOnaylarimApiResult.keySecret,
+                signedData: signStepTwoResult.signedData,
+                operationId: operationIdOfSignStepOne.value,
+                signatureLevel: selectedCadesSignatureLevel.value.value,
+              } as ProxyFinishSignForCadesRequestV2;
+              logs.value.push("Sizin sunucu katmanına FinishSign isteği gönderiliyor.");
+              axios
+                .post(store.API_URL + "/Onaylarim/FinishSignForCadesV2", finishSignForCadesRequestV2)
+                .then((finishSignResponse) => {
+                  logs.value.push("Sizin sunucu katmanına FinishSignForCadesV2 isteği gönderildi. Detaylar için console'a bakınız.");
+                  console.log("Sizin sunucu katmanına FinishSignForCadesV2 isteği gönderildi.", finishSignResponse);
+                  const finishSignResult = finishSignResponse.data as ProxyFinishSignResult;
+                  if (finishSignResult.isSuccess) {
+                    logs.value.push("Sizin sunucu katmanına FinishSignForCadesV2 istiği sonucu: İşlem başarılı.");
+                    waitString.value = "İmza işlemi tamamlandı.";
+
+                    operationIdOfFinishSign.value = finishSignResult.operationId;
+                    isSuccess.value = true;
+                  } else {
+                    logs.value.push("Sizin sunucu katmanına FinishSignForCadesV2 istiği sonucu: İşlem başarısız.");
+                    waitString.value = "İmza işlemi tamamlanamadı.";
+                  }
+                })
+                .catch((error) => {
+                  logs.value.push("Sizin sunucu katmanına FinishSignForCadesV2 isteği gönderilemedi. Mesaj: " + HandleError(error) + " Detaylar için console'a bakınız.");
+                  console.log("Sizin sunucu katmanına FinishSignForCadesV2 isteği gönderilemedi.", error);
+                });
+            }
+          }
+        })
+        .catch((error) => {
+          logs.value.push("e-İmza aracına SIGNSTEPTWO isteği gönderilemedi. Mesaj: " + HandleError(error) + " Detaylar için console'a bakınız.");
+          console.log("e-İmza aracına SIGNSTEPTWO isteği gönderilemedi.", error);
+        });
+    })
+    .catch((error) => {
+      logs.value.push("Sizin sunucu katmanına CreateStateOnOnaylarimApiForCadesV2 isteği gönderilemedi. Mesaj: " + HandleError(error) + " Detaylar için console'a bakınız.");
+      console.log("Sizin sunucu katmanına CreateStateOnOnaylarimApiForCadesV2 isteği gönderilemedi.", error);
+    });
+}
+
+function SignXadesV2(certificate: CertificateInfo) {
+
+  const envelopingOrEnveloped =
+        selectedIsEnvelopingOrEnvelopedOption.value.id === "ENVELOPING" || selectedIsEnvelopingOrEnvelopedOption.value.id === "ENVELOPED"
+            ? selectedIsEnvelopingOrEnvelopedOption.value.id
+            : "ENVELOPED";
+
+  const createStateOnOnaylarimApiForXadesRequestV2 =
+    {
+      certificate: certificate.data,
+      operationId: operationIdOfFileUpload.value,
+      envelopingOrEnveloped: envelopingOrEnveloped,
+      serialOrParallel: selectedIsSerialOrParallelOption.value.id,
+      citizenshipNo: null,
+      signatureTurkishProfile: null,
+      signaturePath: signaturePath.value,
+      envelopingObjectMimeType:envelopingObjectMimeType.value,
+      envelopingObjectEncoding:envelopingObjectEncoding.value
+    } as ProxyCreateStateOnOnaylarimApiForXadesRequestV2;
+
+
+
+  waitString.value = "İmza işlemi hazırlanıyor.";
+  logs.value.push("Sizin sunucu katmanına CreateStateOnOnaylarimApiForXadesV2 isteği gönderiliyor.");
+  axios
+    .post(store.API_URL + "/Onaylarim/CreateStateOnOnaylarimApiForXadesV2", createStateOnOnaylarimApiForXadesRequestV2)
+    .then((createStateOnOnaylarimApiForXadesResponse) => {
+      logs.value.push("Sizin sunucu katmanına CreateStateOnOnaylarimApiForXadesV2 isteği gönderildi. Detaylar için console'a bakınız.");
+      console.log("Sizin sunucu katmanına CreateStateOnOnaylarimApiForXadesV2 isteği gönderildi.", createStateOnOnaylarimApiForXadesResponse);
+
+      waitString.value = "İmza işlemi baştıldı.";
+      const config = {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      };
+      const createStateOnOnaylarimApiResult = createStateOnOnaylarimApiForXadesResponse.data as ProxyCreateStateOnOnaylarimApiResult;
+      console.log("createStateOnOnaylarimApiResult", createStateOnOnaylarimApiResult);
+
+
+
+      if (createStateOnOnaylarimApiResult.error !== undefined && createStateOnOnaylarimApiResult.error !== null && createStateOnOnaylarimApiResult.error.length > 0) {
+        logs.value.push("Sizin sunucu katmanına CreateStateOnOnaylarimApiForXadesV2 isteği hata döndü. Hata: " + createStateOnOnaylarimApiResult.error);
+        return;
+      }
+
+      operationIdOfSignStepOne.value = createStateOnOnaylarimApiResult.operationId;
+
+      const signStepTwoRequest = {
+        keyId: createStateOnOnaylarimApiResult.keyID,
+        keySecret: createStateOnOnaylarimApiResult.keySecret,
+        state: createStateOnOnaylarimApiResult.state,
+        pkcsLibrary: certificate.pkcsLibrary,
+        slot: certificate.slot,
+        pin: userPin.value,
+        certificateIndex: certificate.certificateIndex
+      } as WebToAvalonSignStepTwoRequest;
+      // e-imza aracına e-imza atması için istekte bulunulur. Kartta bulunan sertifika ile imzalama işlemi bu adımda yapılır.
+      logs.value.push("e-İmza aracına SIGNSTEPTWO isteği gönderiliyor.");
+      axios
+        .post(workingUrl.value + "/signStepTwo", JSON.stringify(signStepTwoRequest), config)
+        .then((signStepTwoResponse) => {
+          const signStepTwoResult = signStepTwoResponse.data as SignStepTwoResult;
+          if (signStepTwoResult.error !== undefined && signStepTwoResult.error !== null) {
+            if (signStepTwoResult.error.search("INCORRECT_PIN") >= 0) {
+              logs.value.push("e-İmza aracına SIGNSTEPTWO isteği hata döndü. Detaylar için console'a bakınız.");
+              console.log("e-İmza aracına SIGNSTEPTWO isteği sonucu.", signStepTwoResult);
+              waitString.value = "Hata oluştu. " + "e-İmza şifreniz yanlış.";
+            } else if (signStepTwoResult.error.search("PIN_BLOCKED") >= 0) {
+              logs.value.push("e-İmza aracına SIGNSTEPTWO isteği hata döndü. Detaylar için console'a bakınız.");
+              console.log("e-İmza aracına SIGNSTEPTWO isteği sonucu.", signStepTwoResult);
+              waitString.value = "Hata oluştu. " + "e-İmza şifreniz blokeli.";
+            } else {
+              logs.value.push("e-İmza aracına SIGNSTEPTWO isteği hata döndü. Detaylar için console'a bakınız.");
+              console.log("e-İmza aracına SIGNSTEPTWO isteği sonucu.", signStepTwoResult);
+              waitString.value = "Hata oluştu. " + signStepTwoResult.error;
+            }
+          } else {
+            if (signStepTwoResult.error) {
+              logs.value.push("e-İmza aracına SIGNSTEPTWO isteği hata döndü. Detaylar için console'a bakınız.");
+              console.log("e-İmza aracına SIGNSTEPTWO isteği sonucu.", signStepTwoResult);
+              waitString.value = "Hata oluştu. " + signStepTwoResult.error;
+            } else {
+              logs.value.push("e-İmza aracına SIGNSTEPTWO isteği başarıyla tamamlandı.");
+              // e-imza son adım çalıştırılır. 2. adımda imzalanan veri API'ye gönderilir
+              const finishSignForXadesRequestV2 = {
+                keyId: createStateOnOnaylarimApiResult.keyID,
+                keySecret: createStateOnOnaylarimApiResult.keySecret,
+                signedData: signStepTwoResult.signedData,
+                operationId: operationIdOfSignStepOne.value,
+                signatureLevel: selectedXadesSignatureLevel.value.value,
+              } as ProxyFinishSignForXadesRequestV2;
+              logs.value.push("Sizin sunucu katmanına FinishSign isteği gönderiliyor.");
+              axios
+                .post(store.API_URL + "/Onaylarim/FinishSignForXadesV2", finishSignForXadesRequestV2)
+                .then((finishSignResponse) => {
+                  logs.value.push("Sizin sunucu katmanına FinishSignForXadesV2 isteği gönderildi. Detaylar için console'a bakınız.");
+                  console.log("Sizin sunucu katmanına FinishSignForXadesV2 isteği gönderildi.", finishSignResponse);
+                  const finishSignResult = finishSignResponse.data as ProxyFinishSignResult;
+                  if (finishSignResult.isSuccess) {
+                    logs.value.push("Sizin sunucu katmanına FinishSignForXadesV2 istiği sonucu: İşlem başarılı.");
+                    waitString.value = "İmza işlemi tamamlandı.";
+
+                    operationIdOfFinishSign.value = finishSignResult.operationId;
+                    isSuccess.value = true;
+                  } else {
+                    logs.value.push("Sizin sunucu katmanına FinishSignForXadesV2 istiği sonucu: İşlem başarısız.");
+                    waitString.value = "İmza işlemi tamamlanamadı.";
+                  }
+                })
+                .catch((error) => {
+                  logs.value.push("Sizin sunucu katmanına FinishSignForXadesV2 isteği gönderilemedi. Mesaj: " + HandleError(error) + " Detaylar için console'a bakınız.");
+                  console.log("Sizin sunucu katmanına FinishSignForXadesV2 isteği gönderilemedi.", error);
+                });
+            }
+          }
+        })
+        .catch((error) => {
+          logs.value.push("e-İmza aracına SIGNSTEPTWO isteği gönderilemedi. Mesaj: " + HandleError(error) + " Detaylar için console'a bakınız.");
+          console.log("e-İmza aracına SIGNSTEPTWO isteği gönderilemedi.", error);
+        });
+    })
+    .catch((error) => {
+      logs.value.push("Sizin sunucu katmanına CreateStateOnOnaylarimApiForXadesV2 isteği gönderilemedi. Mesaj: " + HandleError(error) + " Detaylar için console'a bakınız.");
+      console.log("Sizin sunucu katmanına CreateStateOnOnaylarimApiForXadesV2 isteği gönderilemedi.", error);
+    });
+}
+
 // https://github.com/uuidjs/uuid kullanılmak istenmediğinde onun yerine aşağıdaki fonksiyon kullanılabilir
 // function uuidv4(): string {
 //     return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, (c: string) => {
@@ -458,13 +737,13 @@ function GetSignatureListPades() {
   logs.value.push("Sizin sunucu katmanına GetSignatureListPades isteği gönderiliyor.");
   // mobil imza işlemi yapılır
   axios
-    .get(store.API_URL + "/Onaylarim/GetSignatureListPades?operationId=" + operationId.value)
+    .get(store.API_URL + "/Onaylarim/GetSignatureListPadesV2?operationId=" + operationIdOfFileUpload.value)
     .then((getSignatureListResponse) => {
       logs.value.push("Sizin sunucu katmanına GetSignatureListPades isteği gönderildi. Detaylar için console'a bakınız.");
       console.log("Sizin sunucu katmanına GetSignatureListPades isteği gönderildi.", getSignatureListResponse);
-      const getSignatureListResult = getSignatureListResponse.data as GetSignatureListResult;
+      const getSignatureListResult = getSignatureListResponse.data as ProxyGetSignatureListResult;
       signatureList.value = getSignatureListResult.signatures;
-        waitString.value = "Pades imza listesi alındı.";
+      waitString.value = "Pades imza listesi alındı.";
       console.log("getSignatureListResult", getSignatureListResult);
     })
     .catch((error) => {
@@ -482,14 +761,14 @@ function GetSignatureListCades() {
   logs.value.push("Sizin sunucu katmanına GetSignatureListCades isteği gönderiliyor.");
   // mobil imza işlemi yapılır
   axios
-    .get(store.API_URL + "/Onaylarim/GetSignatureListCades?operationId=" + operationId.value)
+    .get(store.API_URL + "/Onaylarim/GetSignatureListCadesV2?operationId=" + operationIdOfFileUpload.value)
     .then((getSignatureListResponse) => {
       logs.value.push("Sizin sunucu katmanına GetSignatureListCades isteği gönderildi. Detaylar için console'a bakınız.");
       console.log("Sizin sunucu katmanına GetSignatureListCades isteği gönderildi.", getSignatureListResponse);
-      const getSignatureListResult = getSignatureListResponse.data as GetSignatureListResult;
+      const getSignatureListResult = getSignatureListResponse.data as ProxyGetSignatureListResult;
       signatureList.value = getSignatureListResult.signatures;
       console.log("getSignatureListResult", getSignatureListResult);
-              waitString.value = "Cades imza listesi alındı.";
+      waitString.value = "Cades imza listesi alındı.";
     })
     .catch((error) => {
       logs.value.push("Sizin sunucu katmanına GetSignatureListCades isteği gönderilemedi. Mesaj: " + HandleError(error) + " Detaylar için console'a bakınız.");
@@ -505,11 +784,11 @@ function GetSignatureListXades() {
   logs.value.push("Sizin sunucu katmanına GetSignatureListXades isteği gönderiliyor.");
   // mobil imza işlemi yapılır
   axios
-    .get(store.API_URL + "/Onaylarim/GetSignatureListXades?operationId=" + operationId.value)
+    .get(store.API_URL + "/Onaylarim/GetSignatureListXadesV2?operationId=" + operationIdOfFileUpload.value)
     .then((getSignatureListResponse) => {
       logs.value.push("Sizin sunucu katmanına GetSignatureListXades isteği gönderildi. Detaylar için console'a bakınız.");
       console.log("Sizin sunucu katmanına GetSignatureListXades isteği gönderildi.", getSignatureListResponse);
-      const getSignatureListResult = getSignatureListResponse.data as GetSignatureListResult;
+      const getSignatureListResult = getSignatureListResponse.data as ProxyGetSignatureListResult;
       signatureList.value = getSignatureListResult.signatures;
       console.log("getSignatureListResult", getSignatureListResult);
       waitString.value = "Xades imza listesi alındı.";
@@ -525,13 +804,15 @@ function GetSignatureListXades() {
 
 function DownloadFile() {
   axios
-    .get(store.API_URL + "/Onaylarim/DownloadSignedFileFromOnaylarimApi?operationId=" + operationId.value, { responseType: "blob" })
+    .get(store.API_URL + "/Onaylarim/DownloadCoreV2?operationId=" + operationIdOfFinishSign.value, { responseType: "blob" })
     .then((e) => {
       if (e.data.error) {
         waitString.value = "Hata oluştu. " + e.data.error;
       } else {
         let filename = "dosya.pdf";
-        const contentDisposition = e.headers["Content-Disposition"];
+        console.log("e.headers", e.headers);
+        const contentDisposition = e.headers["content-disposition"];
+        console.log("contentDisposition", contentDisposition);
         if (contentDisposition) {
           const match = contentDisposition.match(/filename[^;\n]*=(UTF-\d['"]*)?((['"]).*?[.]$\2|[^;\n]*)?/gi);
           if (match && match[1]) {
@@ -566,26 +847,24 @@ function DownloadFile() {
   <main class="space-y-4">
     <CardComponent title="e-İmza V2">
       <template v-slot:icon>
-        <Cog6ToothIcon></Cog6ToothIcon>
+        <CpuChipIcon></CpuChipIcon>
       </template>
       <template v-slot:content>
         <div class="flex items-end ">
           <div class="">
             <div class="text-sm text-gray-700">
               <p>Hangi türde e-imza atılmasını istiyorsanız seçiniz?</p>
+
             </div>
             <div class="mt-1 flex items-center">
               <fieldset>
                 <legend class="sr-only">Notification method</legend>
                 <div class="space-y-4 sm:flex sm:items-center sm:space-x-10 sm:space-y-0">
-                  <div v-for="signatureType in signatureTypes" :key="signatureType.id"
-                    class="flex items-center cursor-pointer">
-                    <input :id="signatureType.id" name="notification-method" type="radio" :value="signatureType"
-                      v-model="selectedSignatureType"
+                  <div v-for="signatureType in signatureTypes" :key="signatureType.id" class="flex items-center cursor-pointer">
+                    <input :id="signatureType.id" name="notification-method" type="radio" :value="signatureType" v-model="selectedSignatureType"
                       class="h-4 w-4 border-gray-300 text-yellow-600 focus:ring-yellow-600 cursor-pointer" />
-                    <label :for="signatureType.id"
-                      class="ml-3 block text-sm font-medium leading-6 text-gray-900 cursor-pointer">{{
-                        signatureType.title }}</label>
+                    <label :for="signatureType.id" class="ml-3 block text-sm font-medium leading-6 text-gray-900 cursor-pointer">{{
+                      signatureType.title }}</label>
                   </div>
                 </div>
               </fieldset>
@@ -608,8 +887,8 @@ function DownloadFile() {
                 </div>
               </div>
 
-              <Listbox as="div" v-model="selectedPadesSignatureLevel" class="max-w-sm mt-2"
-                v-if="selectedSignatureType.id === 'pades'">
+
+              <Listbox as="div" v-model="selectedPadesSignatureLevel" class="max-w-sm mt-2" v-if="selectedSignatureType.id === 'pades'">
                 <ListboxLabel class="block text-sm/6 font-medium text-gray-900 dark:text-white">Pades
                   İmza Seviyesi</ListboxLabel>
                 <div class="relative mt-0">
@@ -621,18 +900,15 @@ function DownloadFile() {
                     </span>
                   </ListboxButton>
 
-                  <transition leave-active-class="transition ease-in duration-100" leave-from-class="opacity-100"
-                    leave-to-class="opacity-0">
+                  <transition leave-active-class="transition ease-in duration-100" leave-from-class="opacity-100" leave-to-class="opacity-0">
                     <ListboxOptions
                       class="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
-                      <ListboxOption as="template" v-for="padesSignatureLevel in signatureLevelForPadesOptions"
-                        :key="padesSignatureLevel.value" :value="padesSignatureLevel" v-slot="{ active, selected }">
-                        <li
-                          :class="[active ? 'bg-yellow-600 text-white' : 'text-gray-900', 'relative cursor-default select-none py-2 pl-3 pr-9']">
+                      <ListboxOption as="template" v-for="padesSignatureLevel in signatureLevelForPadesOptions" :key="padesSignatureLevel.value" :value="padesSignatureLevel"
+                        v-slot="{ active, selected }">
+                        <li :class="[active ? 'bg-yellow-600 text-white' : 'text-gray-900', 'relative cursor-default select-none py-2 pl-3 pr-9']">
                           <span :class="[selected ? 'font-semibold' : 'font-normal', 'block truncate']">{{
                             padesSignatureLevel.label }}</span>
-                          <span v-if="selected"
-                            :class="[active ? 'text-white' : 'text-yellow-600', 'absolute inset-y-0 right-0 flex items-center pr-4']">
+                          <span v-if="selected" :class="[active ? 'text-white' : 'text-yellow-600', 'absolute inset-y-0 right-0 flex items-center pr-4']">
                             <CheckIcon class="h-5 w-5" aria-hidden="true" />
                           </span>
                         </li>
@@ -642,8 +918,7 @@ function DownloadFile() {
                 </div>
               </Listbox>
 
-              <Listbox as="div" v-model="selectedCadesSignatureLevel" class="max-w-sm mt-2"
-                v-if="selectedSignatureType.id === 'cades'">
+              <Listbox as="div" v-model="selectedCadesSignatureLevel" class="max-w-sm mt-2" v-if="selectedSignatureType.id === 'cades'">
                 <ListboxLabel class="block text-sm/6 font-medium text-gray-900 dark:text-white">Cades
                   İmza Seviyesi</ListboxLabel>
                 <div class="relative mt-0">
@@ -655,18 +930,15 @@ function DownloadFile() {
                     </span>
                   </ListboxButton>
 
-                  <transition leave-active-class="transition ease-in duration-100" leave-from-class="opacity-100"
-                    leave-to-class="opacity-0">
+                  <transition leave-active-class="transition ease-in duration-100" leave-from-class="opacity-100" leave-to-class="opacity-0">
                     <ListboxOptions
                       class="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
-                      <ListboxOption as="template" v-for="cadesSignatureLevel in signatureLevelForCadesOptions"
-                        :key="cadesSignatureLevel.value" :value="cadesSignatureLevel" v-slot="{ active, selected }">
-                        <li
-                          :class="[active ? 'bg-yellow-600 text-white' : 'text-gray-900', 'relative cursor-default select-none py-2 pl-3 pr-9']">
+                      <ListboxOption as="template" v-for="cadesSignatureLevel in signatureLevelForCadesOptions" :key="cadesSignatureLevel.value" :value="cadesSignatureLevel"
+                        v-slot="{ active, selected }">
+                        <li :class="[active ? 'bg-yellow-600 text-white' : 'text-gray-900', 'relative cursor-default select-none py-2 pl-3 pr-9']">
                           <span :class="[selected ? 'font-semibold' : 'font-normal', 'block truncate']">{{
                             cadesSignatureLevel.label }}</span>
-                          <span v-if="selected"
-                            :class="[active ? 'text-white' : 'text-yellow-600', 'absolute inset-y-0 right-0 flex items-center pr-4']">
+                          <span v-if="selected" :class="[active ? 'text-white' : 'text-yellow-600', 'absolute inset-y-0 right-0 flex items-center pr-4']">
                             <CheckIcon class="h-5 w-5" aria-hidden="true" />
                           </span>
                         </li>
@@ -676,8 +948,7 @@ function DownloadFile() {
                 </div>
               </Listbox>
 
-              <Listbox as="div" v-model="selectedXadesSignatureLevel" class="max-w-sm mt-2"
-                v-if="selectedSignatureType.id === 'xades'">
+              <Listbox as="div" v-model="selectedXadesSignatureLevel" class="max-w-sm mt-2" v-if="selectedSignatureType.id === 'xades'">
                 <ListboxLabel class="block text-sm/6 font-medium text-gray-900 dark:text-white">Xades
                   İmza Seviyesi</ListboxLabel>
                 <div class="relative mt-0">
@@ -689,18 +960,15 @@ function DownloadFile() {
                     </span>
                   </ListboxButton>
 
-                  <transition leave-active-class="transition ease-in duration-100" leave-from-class="opacity-100"
-                    leave-to-class="opacity-0">
+                  <transition leave-active-class="transition ease-in duration-100" leave-from-class="opacity-100" leave-to-class="opacity-0">
                     <ListboxOptions
                       class="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
-                      <ListboxOption as="template" v-for="xadesSignatureLevel in signatureLevelForXadesOptions"
-                        :key="xadesSignatureLevel.value" :value="xadesSignatureLevel" v-slot="{ active, selected }">
-                        <li
-                          :class="[active ? 'bg-yellow-600 text-white' : 'text-gray-900', 'relative cursor-default select-none py-2 pl-3 pr-9']">
+                      <ListboxOption as="template" v-for="xadesSignatureLevel in signatureLevelForXadesOptions" :key="xadesSignatureLevel.value" :value="xadesSignatureLevel"
+                        v-slot="{ active, selected }">
+                        <li :class="[active ? 'bg-yellow-600 text-white' : 'text-gray-900', 'relative cursor-default select-none py-2 pl-3 pr-9']">
                           <span :class="[selected ? 'font-semibold' : 'font-normal', 'block truncate']">{{
                             xadesSignatureLevel.label }}</span>
-                          <span v-if="selected"
-                            :class="[active ? 'text-white' : 'text-yellow-600', 'absolute inset-y-0 right-0 flex items-center pr-4']">
+                          <span v-if="selected" :class="[active ? 'text-white' : 'text-yellow-600', 'absolute inset-y-0 right-0 flex items-center pr-4']">
                             <CheckIcon class="h-5 w-5" aria-hidden="true" />
                           </span>
                         </li>
@@ -710,8 +978,7 @@ function DownloadFile() {
                 </div>
               </Listbox>
 
-              <Listbox as="div" v-model="selectedIsEnvelopingOrEnvelopedOption" class="max-w-sm mt-2"
-                v-if="selectedSignatureType.id === 'xades'">
+              <Listbox as="div" v-model="selectedIsEnvelopingOrEnvelopedOption" class="max-w-sm mt-2" v-if="selectedSignatureType.id === 'xades'">
                 <ListboxLabel class="block text-sm/6 font-medium text-gray-900 dark:text-white">Xades
                   İmza Türü</ListboxLabel>
                 <div class="relative mt-0">
@@ -724,20 +991,15 @@ function DownloadFile() {
                     </span>
                   </ListboxButton>
 
-                  <transition leave-active-class="transition ease-in duration-100" leave-from-class="opacity-100"
-                    leave-to-class="opacity-0">
+                  <transition leave-active-class="transition ease-in duration-100" leave-from-class="opacity-100" leave-to-class="opacity-0">
                     <ListboxOptions
                       class="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
-                      <ListboxOption as="template"
-                        v-for="isEnvelopingOrEnvelopedOption in isEnvelopingOrEnvelopedOptions"
-                        :key="isEnvelopingOrEnvelopedOption.title" :value="isEnvelopingOrEnvelopedOption"
-                        v-slot="{ active, selected }">
-                        <li
-                          :class="[active ? 'bg-yellow-600 text-white' : 'text-gray-900', 'relative cursor-default select-none py-2 pl-3 pr-9']">
+                      <ListboxOption as="template" v-for="isEnvelopingOrEnvelopedOption in isEnvelopingOrEnvelopedOptions" :key="isEnvelopingOrEnvelopedOption.title"
+                        :value="isEnvelopingOrEnvelopedOption" v-slot="{ active, selected }">
+                        <li :class="[active ? 'bg-yellow-600 text-white' : 'text-gray-900', 'relative cursor-default select-none py-2 pl-3 pr-9']">
                           <span :class="[selected ? 'font-semibold' : 'font-normal', 'block truncate']">{{
                             isEnvelopingOrEnvelopedOption.title }}</span>
-                          <span v-if="selected"
-                            :class="[active ? 'text-white' : 'text-yellow-600', 'absolute inset-y-0 right-0 flex items-center pr-4']">
+                          <span v-if="selected" :class="[active ? 'text-white' : 'text-yellow-600', 'absolute inset-y-0 right-0 flex items-center pr-4']">
                             <CheckIcon class="h-5 w-5" aria-hidden="true" />
                           </span>
                         </li>
@@ -747,8 +1009,7 @@ function DownloadFile() {
                 </div>
               </Listbox>
 
-              <Listbox as="div" v-model="selectedIsSerialOrParallelOption" class="max-w-sm mt-2"
-                v-if="selectedSignatureType.id === 'cades' || selectedSignatureType.id === 'xades'">
+              <Listbox as="div" v-model="selectedIsSerialOrParallelOption" class="max-w-sm mt-2" v-if="selectedSignatureType.id === 'cades' || selectedSignatureType.id === 'xades'">
                 <ListboxLabel class="block text-sm/6 font-medium text-gray-900 dark:text-white">İmza
                   Metodu</ListboxLabel>
                 <div class="relative mt-0">
@@ -760,19 +1021,15 @@ function DownloadFile() {
                     </span>
                   </ListboxButton>
 
-                  <transition leave-active-class="transition ease-in duration-100" leave-from-class="opacity-100"
-                    leave-to-class="opacity-0">
+                  <transition leave-active-class="transition ease-in duration-100" leave-from-class="opacity-100" leave-to-class="opacity-0">
                     <ListboxOptions
                       class="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
-                      <ListboxOption as="template" v-for="isSerialOrParallelOption in isSerialOrParallelOptions"
-                        :key="isSerialOrParallelOption.title" :value="isSerialOrParallelOption"
+                      <ListboxOption as="template" v-for="isSerialOrParallelOption in isSerialOrParallelOptions" :key="isSerialOrParallelOption.title" :value="isSerialOrParallelOption"
                         v-slot="{ active, selected }">
-                        <li
-                          :class="[active ? 'bg-yellow-600 text-white' : 'text-gray-900', 'relative cursor-default select-none py-2 pl-3 pr-9']">
+                        <li :class="[active ? 'bg-yellow-600 text-white' : 'text-gray-900', 'relative cursor-default select-none py-2 pl-3 pr-9']">
                           <span :class="[selected ? 'font-semibold' : 'font-normal', 'block truncate']">{{
                             isSerialOrParallelOption.title }}</span>
-                          <span v-if="selected"
-                            :class="[active ? 'text-white' : 'text-yellow-600', 'absolute inset-y-0 right-0 flex items-center pr-4']">
+                          <span v-if="selected" :class="[active ? 'text-white' : 'text-yellow-600', 'absolute inset-y-0 right-0 flex items-center pr-4']">
                             <CheckIcon class="h-5 w-5" aria-hidden="true" />
                           </span>
                         </li>
@@ -782,16 +1039,30 @@ function DownloadFile() {
                 </div>
               </Listbox>
 
-              <div class="mt-2 max-w-sm"
-                v-if="(selectedSignatureType.id === 'cades' || selectedSignatureType.id === 'xades') && selectedIsSerialOrParallelOption.id === 'SERIAL' && signatureList && signatureList.length > 0">
+              <div class="mt-2 max-w-sm" v-if="(selectedSignatureType.id === 'xades') && selectedIsEnvelopingOrEnvelopedOption.id === 'ENVELOPING'">
+                <label for="envelopingObjectMimeType" class="block text-sm/6 font-medium text-gray-900 dark:text-white">Enveloping Object MIME Type</label>
+                <input type="text" name="envelopingObjectMimeType" id="envelopingObjectMimeType" v-model="envelopingObjectMimeType" autocomplete="off"
+                  class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-yellow-600 sm:text-sm sm:leading-6"
+                  placeholder="application/pdf" />
+              </div>
+
+              <div class="mt-2 max-w-sm" v-if="(selectedSignatureType.id === 'xades') && selectedIsEnvelopingOrEnvelopedOption.id === 'ENVELOPING'">
+                <label for="envelopingObjectEncoding" class="block text-sm/6 font-medium text-gray-900 dark:text-white">Enveloping Object Encoding</label>
+                  
+                <input type="text" name="envelopingObjectEncoding" id="envelopingObjectEncoding" v-model="envelopingObjectEncoding" autocomplete="off"
+                  class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-yellow-600 sm:text-sm sm:leading-6"
+                  placeholder="application/pdf" />
+              </div>
+
+              <div class="mt-2 max-w-sm" v-if="(selectedSignatureType.id === 'cades' || selectedSignatureType.id === 'xades') && signatureList && signatureList.length > 0">
                 <label for="signaturePath" class="block text-sm/6 font-medium text-gray-900 dark:text-white">Üstüne İmza
                   Atılacak İmza Adı</label>
-                <input type="text" name="signaturePath" id="signaturePath" v-model="signaturePath"
+                <input type="text" name="signaturePath" id="signaturePath" v-model="signaturePath" autocomplete="off"
                   class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-yellow-600 sm:text-sm sm:leading-6"
                   placeholder="S0:S0" />
               </div>
 
-              <Listbox as="div" v-model="selectedTurkishProfile" class="max-w-sm mt-2">
+              <Listbox as="div" v-model="selectedTurkishProfile" class="max-w-sm mt-2 hidden">
                 <ListboxLabel class="block text-sm/6 font-medium text-gray-900 dark:text-white">Turkish
                   Profile</ListboxLabel>
                 <div class="relative mt-0">
@@ -803,20 +1074,15 @@ function DownloadFile() {
                     </span>
                   </ListboxButton>
 
-                  <transition leave-active-class="transition ease-in duration-100" leave-from-class="opacity-100"
-                    leave-to-class="opacity-0">
+                  <transition leave-active-class="transition ease-in duration-100" leave-from-class="opacity-100" leave-to-class="opacity-0">
                     <ListboxOptions
                       class="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
-                      <ListboxOption as="template"
-                        v-for="turkishProfile in turkishProfileOptions.filter(profile => !profile.disabled)"
-                        :key="turkishProfile.id" :value="turkishProfile" v-slot="{ active, selectedTurkishProfile }">
-                        <li
-                          :class="[active ? 'bg-yellow-600 text-white' : 'text-gray-900', 'relative cursor-default select-none py-2 pl-3 pr-9']"
-                          :disabled="turkishProfile.disabled">
+                      <ListboxOption as="template" v-for="turkishProfile in turkishProfileOptions.filter(profile => !profile.disabled)" :key="turkishProfile.id" :value="turkishProfile"
+                        v-slot="{ active, selectedTurkishProfile }">
+                        <li :class="[active ? 'bg-yellow-600 text-white' : 'text-gray-900', 'relative cursor-default select-none py-2 pl-3 pr-9']" :disabled="turkishProfile.disabled">
                           <span :class="[selectedTurkishProfile ? 'font-semibold' : 'font-normal', 'block truncate']">{{
                             turkishProfile.title }}</span>
-                          <span v-if="selectedTurkishProfile"
-                            :class="[active ? 'text-white' : 'text-yellow-600', 'absolute inset-y-0 right-0 flex items-center pr-4']">
+                          <span v-if="selectedTurkishProfile" :class="[active ? 'text-white' : 'text-yellow-600', 'absolute inset-y-0 right-0 flex items-center pr-4']">
                             <CheckIcon class="h-5 w-5" aria-hidden="true" />
                           </span>
                         </li>
@@ -840,14 +1106,14 @@ function DownloadFile() {
 
         <div class="mt-4 px-4 py-2 border-gray-200 border bg-white " id="signatureList">
           <label class="block text-sm font-medium text-gray-900 dark:text-white">Dosyadaki Önceki İmzalar</label>
-          <div v-if="signatureList === null">
-             <div class="text-sm text-gray-700">
+          <div v-if="signatureList === undefined">
+            <div class="text-sm text-gray-700">
               <p>Belge yüklenmedi.</p>
             </div>
           </div>
-          <div v-else-if="signatureList && signatureList.length === 0">
-             <div class="text-sm text-gray-700">
-              <p>Belgede {{  selectedSignatureType.title }} türünde imza bulunmuyor.</p>
+          <div v-else-if="signatureList === null || (signatureList !== null && signatureList.length === 0)">
+            <div class="text-sm text-gray-700">
+              <p>Belgede {{ selectedSignatureType.title }} türünde imza bulunmuyor.</p>
             </div>
           </div>
           <div class="space-y-4 mt-2" v-else>
@@ -876,8 +1142,7 @@ function DownloadFile() {
         <div class="mt-0 pt-4" v-if="waitString">
           <p class="max-w-2xl text-sm leading-6 text-gray-500">{{ waitString }}</p>
 
-          <p v-if="isSuccess" @click="DownloadFile()"
-            class="max-w-2xl text-sm leading-6 text-orange-500 hover:underline cursor-pointer">e-İmzalı
+          <p v-if="operationIdOfFinishSign && operationIdOfFinishSign.length > 0" @click="DownloadFile()" class="max-w-2xl text-sm leading-6 text-orange-500 hover:underline cursor-pointer">e-İmzalı
             dosyayı
             indir</p>
         </div>
@@ -902,7 +1167,7 @@ function DownloadFile() {
       </template>
     </CardComponent>
 
-    <div class="grid grid-cols-2 gap-4">
+    <div class="grid grid-cols-2 gap-4" v-if="localSignerMode === 'baglantiKurulamadı'">
       <CardComponent v-if="localSignerMode === 'baglantiKurulamadı'" title="e-İmza Aracını Aç">
         <template v-slot:icon>
           <ComputerDesktopIcon></ComputerDesktopIcon>
@@ -952,8 +1217,7 @@ function DownloadFile() {
             <p>Bilgisayarınıza takılı e-imzalar aşağıda listelenmiştir. İşlem yapmak istediğiniz sertifika için PIN
               girip imzalama işlemi yapabilirsiniz.</p>
           </div>
-          <div v-if="signerAppResetResult?.certificates !== null && signerAppResetResult?.certificates.length === 0"
-            class="border-t border-gray-200">
+          <div v-if="signerAppResetResult?.certificates !== null && signerAppResetResult?.certificates.length === 0" class="border-t border-gray-200">
             <div class="px-4 sm:px-6">
               <dl>
                 <div class="px-4 py-6 sm:px-0 flex">
@@ -965,12 +1229,9 @@ function DownloadFile() {
               </dl>
             </div>
           </div>
-          <div
-            v-if="signerAppResetResult && signerAppResetResult.certificates !== null && signerAppResetResult.certificates.length > 0"
-            class="border-t border-gray-200">
+          <div v-if="signerAppResetResult && signerAppResetResult.certificates !== null && signerAppResetResult.certificates.length > 0" class="border-t border-gray-200">
             <div class="px-4 sm:px-6">
-              <dl v-for="certificate in signerAppResetResult?.certificates" :key="certificate.id"
-                class="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-4">
+              <dl v-for="certificate in signerAppResetResult?.certificates" :key="certificate.id" class="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-4">
                 <div class="px-4 py-2 sm:py-6 sm:col-span-1 sm:px-0">
                   <dt class="text-sm font-medium leading-6 text-gray-900">Ad Soyad</dt>
                   <dd class="mt-1 text-sm leading-6 text-gray-700">{{ certificate.personFullname }}</dd>
@@ -1005,19 +1266,13 @@ function DownloadFile() {
               </dl>
             </div>
           </div>
-          <div class="pt-4 border-t border-gray-200" v-if="waitString">
-            <p class="max-w-2xl text-sm leading-6 text-gray-500">{{ waitString }}</p>
 
-            <p v-if="operationId && operationId.length > 0" @click="DownloadFile()"
-              class="max-w-2xl text-sm leading-6 text-orange-500 hover:underline cursor-pointer">e-İmzalı dosyayı indir
-            </p>
-          </div>
         </div>
       </template>
     </CardComponent>
     <div class="pt-4 border-t border-gray-200 text-xs" v-if="logs && logs.length > 0">
       <p class="leading-6 text-sm font-medium">İşlemler</p>
-      <p v-for="(logItem, index) in logs" :key="index" class="">{{ logItem }}</p>
+      <p v-for="(logItem, index) in logs.reverse()" :key="index" class=""> {{ logs.length - index }}. {{ logItem }}</p>
     </div>
   </main>
 </template>

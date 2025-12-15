@@ -3,9 +3,9 @@ import { computed, onBeforeUnmount, ref, watch } from "@vue/runtime-core";
 import axios, { AxiosError } from "axios";
 import { Listbox, ListboxButton, ListboxOption, ListboxOptions, ListboxLabel } from "@headlessui/vue";
 import { CheckIcon, ChevronUpDownIcon } from "@heroicons/vue/20/solid";
-import { DevicePhoneMobileIcon } from "@heroicons/vue/24/outline";
+import { DocumentTextIcon } from "@heroicons/vue/24/outline";
 import CardComponent from "./CardComponent.vue";
-import { type UploadFileResult, type AddVerificationInfoCoreRequest } from "@/types/Types";
+import {  type ProxyAddVerificationInfoCoreRequest, type ProxyUploadFileResultV2 } from "@/types/Types";
 import { HandleError } from "@/types/HandleError";
 import store from "@/types/Store";
 
@@ -92,14 +92,16 @@ async function UploadFileToServer() {
 
     const formData = new FormData();
     formData.append("file", selectedFile.value);
+    formData.append("filename", selectedFile.value.name);
 
     try {
         waitString.value = "Dosya sunucuya yükleniyor.";
         logs.value.push(`Sunucuya dosya yükleme isteği gönderiliyor: ${selectedFile.value.name}`);
-        const response = await axios.post(store.API_URL + "/Onaylarim/UploadFile", formData, {
-            headers: { "Content-Type": "multipart/form-data" },
+        
+        const response = await axios.post(store.API_URL + "/Onaylarim/UploadFileV2", formData, {
+            headers: { "Content-Type": "multipart/form-data"  },
         });
-        const uploadResult = response.data as UploadFileResult;
+        const uploadResult = response.data as   ProxyUploadFileResultV2;
         if (uploadResult?.isSuccess) {
             waitString.value = "Dosya sunucuya başarıyla yüklendi.";
             logs.value.push("Dosya sunucuya başarıyla yüklendi.");
@@ -414,7 +416,7 @@ async function AddVerificationInfo() {
         return;
     }
 
-    const request: AddVerificationInfoCoreRequest = {
+    const request: ProxyAddVerificationInfoCoreRequest = {
         operationId: operationId.value,
         verificationInfo: {
             text: verificationText.value.replace(/\r?\n/g, "\r\n"),
@@ -474,7 +476,7 @@ async function AddVerificationInfo() {
 
 function DownloadFile() {
     axios
-        .get(store.API_URL + "/Onaylarim/DownloadFileFromOnaylarimApi?operationId=" + operationId.value + "&fileType=WITHLAYERS", { responseType: "blob" })
+        .get(store.API_URL + "/Onaylarim/DownloadCoreV2?operationId=" + operationId.value, { responseType: "blob" })
         .then((e) => {
             if (e.data.error) {
                 waitString.value = "Hata oluştu. " + e.data.error;
@@ -1013,7 +1015,7 @@ onBeforeUnmount(() => {
         <div class="pt-4 border-t border-gray-200 text-xs" v-if="logs && logs.length > 0">
             <p class="leading-6 text-sm font-medium">İşlemler</p>
 
-            <p v-for="(logItem, index) in logs" :key="index">{{ logItem }}</p>
+            <p v-for="(logItem, index) in logs.reverse()" :key="index" class=""> {{ logs.length - index }}. {{ logItem }}</p>
         </div>
     </main>
 </template>

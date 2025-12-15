@@ -6,7 +6,7 @@ import { Listbox, ListboxButton, ListboxOption, ListboxOptions, ListboxLabel } f
 import { CheckIcon, ChevronUpDownIcon } from "@heroicons/vue/20/solid";
 import { DevicePhoneMobileIcon } from "@heroicons/vue/24/outline";
 import CardComponent from "./CardComponent.vue";
-import { SignatureLevelForPades, SignatureLevelForCades, type GetFingerPrintRequest, type MobileSignRequestV2, type MobilSignResult, type UploadFileResult, type GetSignatureListResult, type GetSignatureListResultItem, SignatureLevelForXades } from "@/types/Types";
+import { SignatureLevelForPades, SignatureLevelForCades, type ProxyGetFingerPrintRequest, type ProxyMobileSignRequestV2, type ProxyMobilSignResult, type ProxyUploadFileResult, type ProxyGetSignatureListResult, type ProxyGetSignatureListResultItem, SignatureLevelForXades, type ProxyUploadFileResultV2 } from "@/types/Types";
 import { HandleError } from "@/types/HandleError";
 import store from "@/types/Store";
 
@@ -25,7 +25,7 @@ const fingerPrint = ref("");
 // işlemin başarıyla tamamlanıp tamamlanmadığını gösterir
 const isSuccess = ref(false);
 // cades imza listesi
-const signatureList = ref(null as Array<GetSignatureListResultItem> | null);
+const signatureList = ref(null as Array<ProxyGetSignatureListResultItem> | null);
 // mobil imza için kullanılacak operatörler. Id değerinde yazan ifade API'ye gönderilir. Bu ifadeler değiştirilmemelidir.
 const operators = [
     { id: "TURKCELL", name: "Turkcell" },
@@ -131,14 +131,16 @@ async function UploadFileToServer() {
 
     const formData = new FormData();
     formData.append("file", selectedFile.value);
+    formData.append("filename", selectedFile.value.name);
 
     try {
         waitString.value = "Dosya sunucuya yükleniyor.";
         logs.value.push(`Sunucuya dosya yükleme isteği gönderiliyor: ${selectedFile.value.name}`);
-        const response = await axios.post(store.API_URL + "/Onaylarim/UploadFile", formData, {
+        
+        const response = await axios.post(store.API_URL + "/Onaylarim/UploadFileV2", formData, {
             headers: { "Content-Type": "multipart/form-data" },
         });
-        const uploadResult = response.data as UploadFileResult;
+        const uploadResult = response.data as ProxyUploadFileResultV2;
         if (uploadResult?.isSuccess) {
             waitString.value = "Dosya sunucuya başarıyla yüklendi.";
             logs.value.push("Dosya sunucuya başarıyla yüklendi.");
@@ -185,11 +187,11 @@ function GetSignatureListPades() {
     logs.value.push("Sizin sunucu katmanına GetSignatureListPades isteği gönderiliyor.");
     // mobil imza işlemi yapılır
     axios
-        .get(store.API_URL + "/Onaylarim/GetSignatureListPades?operationId=" + operationId.value)
+        .get(store.API_URL + "/Onaylarim/GetSignatureListPadesV2?operationId=" + operationId.value)
         .then((getSignatureListResponse) => {
             logs.value.push("Sizin sunucu katmanına GetSignatureListPades isteği gönderildi. Detaylar için console'a bakınız.");
             console.log("Sizin sunucu katmanına GetSignatureListPades isteği gönderildi.", getSignatureListResponse);
-            const getSignatureListResult = getSignatureListResponse.data as GetSignatureListResult;
+            const getSignatureListResult = getSignatureListResponse.data as ProxyGetSignatureListResult;
             signatureList.value = getSignatureListResult.signatures;
             console.log("getSignatureListResult", getSignatureListResult);
         })
@@ -208,11 +210,11 @@ function GetSignatureListCades() {
     logs.value.push("Sizin sunucu katmanına GetSignatureListCades isteği gönderiliyor.");
     // mobil imza işlemi yapılır
     axios
-        .get(store.API_URL + "/Onaylarim/GetSignatureListCades?operationId=" + operationId.value)
+        .get(store.API_URL + "/Onaylarim/GetSignatureListCadesV2?operationId=" + operationId.value)
         .then((getSignatureListResponse) => {
             logs.value.push("Sizin sunucu katmanına GetSignatureListCades isteği gönderildi. Detaylar için console'a bakınız.");
             console.log("Sizin sunucu katmanına GetSignatureListCades isteği gönderildi.", getSignatureListResponse);
-            const getSignatureListResult = getSignatureListResponse.data as GetSignatureListResult;
+            const getSignatureListResult = getSignatureListResponse.data as     ProxyGetSignatureListResult;
             signatureList.value = getSignatureListResult.signatures;
             console.log("getSignatureListResult", getSignatureListResult);
         })
@@ -230,11 +232,11 @@ function GetSignatureListXades() {
     logs.value.push("Sizin sunucu katmanına GetSignatureListXades isteği gönderiliyor.");
     // mobil imza işlemi yapılır
     axios
-        .get(store.API_URL + "/Onaylarim/GetSignatureListXades?operationId=" + operationId.value)
+        .get(store.API_URL + "/Onaylarim/GetSignatureListXadesV2?operationId=" + operationId.value)
         .then((getSignatureListResponse) => {
             logs.value.push("Sizin sunucu katmanına GetSignatureListXades isteği gönderildi. Detaylar için console'a bakınız.");
             console.log("Sizin sunucu katmanına GetSignatureListXades isteği gönderildi.", getSignatureListResponse);
-            const getSignatureListResult = getSignatureListResponse.data as GetSignatureListResult;
+            const getSignatureListResult = getSignatureListResponse.data as ProxyGetSignatureListResult;
             signatureList.value = getSignatureListResult.signatures;
             console.log("getSignatureListResult", getSignatureListResult);
         })
@@ -278,7 +280,7 @@ function MobileSignV2() {
             console.log("selectedCadesSignatureLevel", selectedCadesSignatureLevel);
 
     const mobileSignRequest = {
-        operationId: operationId.value,
+        operationId:operationId.value,
         signatureType: selectedSignatureType.value.id,
         phoneNumber: phoneNumber.value,
         operator: selectedOperator.value.id,
@@ -291,7 +293,7 @@ function MobileSignV2() {
         serialOrParallel,
         isFirstSigner: signatureList.value ===null || signatureList.value.length === 0 ? true : false,
         envelopingOrEnveloped
-    } as MobileSignRequestV2;
+    } as ProxyMobileSignRequestV2;
     waitString.value = "İmza işlemi hazırlanıyor.";
     logs.value.push("Sizin sunucu katmanına MobileSign isteği gönderiliyor.");
     // mobil imza işlemi yapılır
@@ -300,7 +302,7 @@ function MobileSignV2() {
         .then((mobileSignResponse) => {
             logs.value.push("Sizin sunucu katmanına MobileSign isteği gönderildi. Detaylar için console'a bakınız.");
             console.log("Sizin sunucu katmanına MobileSign isteği gönderildi.", mobileSignResponse);
-            const mobileSignResult = mobileSignResponse.data as MobilSignResult;
+            const mobileSignResult = mobileSignResponse.data as ProxyMobilSignResult;
             isSuccess.value = mobileSignResult.isSuccess;
             if (mobileSignResult.error) {
                 waitString.value = "İmza işlemi tamamlanamadı. Hata: " + mobileSignResult.error;
@@ -314,7 +316,7 @@ function MobileSignV2() {
         });
     // mobil imza işlemi sürerken işleme ilişkin parmak izi değeri alınır
     axios
-        .post(store.API_URL + "/Onaylarim/GetFingerPrint", { operationId: operationId.value } as GetFingerPrintRequest)
+        .post(store.API_URL + "/Onaylarim/GetFingerPrint", { operationId: operationId.value } as ProxyGetFingerPrintRequest)
         .then((getFingerResponse) => {
             console.log("getFingerResponse", getFingerResponse);
             fingerPrint.value = getFingerResponse.data.fingerPrint;
@@ -728,7 +730,7 @@ function DownloadFile() {
         <div class="pt-4 border-t border-gray-200 text-xs" v-if="logs && logs.length > 0">
             <p class="leading-6 text-sm font-medium">İşlemler</p>
 
-            <p v-for="(logItem, index) in logs" :key="index" class="">{{ logItem }}</p>
+            <p v-for="(logItem, index) in logs.reverse()" :key="index" class=""> {{ logs.length - index }}. {{ logItem }}</p>
         </div>
     </main>
 </template>

@@ -11,18 +11,30 @@ import SettingsComponent from "./components/SettingsComponent.vue";
 import PadesUpgradeComponent from "./components/PadesUpgradeComponent.vue";
 import PadesUpgradeComponentV2 from "./components/PadesUpgradeComponentV2.vue";
 import CadesUpgradeComponent from "./components/CadesUpgradeComponent.vue";
+import CadesUpgradeComponentV2 from "./components/CadesUpgradeComponentV2.vue";
+import XadesUpgradeComponentV2 from "./components/XadesUpgradeComponentV2.vue";
+import { StarIcon } from "@heroicons/vue/20/solid";
 
 const tabs = [
     { name: "e-İmza", tag: shallowRef(SignComponent) },
-    { name: "e-İmza V2", tag: shallowRef(SignComponentV2) },
+    
     { name: "Mobil İmza", tag: shallowRef(MobileSignComponent) },
-    { name: "Mobil İmza V2", tag: shallowRef(MobileSignComponentV2) },
+    
     { name: "PDF Convert", tag: shallowRef(PdfConvertComponent) },
     { name: "PDF Add Layers", tag: shallowRef(PdfAddLayers) },
-    { name: "PDF Add Layers V2", tag: shallowRef(PdfAddQrAndVerificationInfoV2) },
+    
     { name: "PAdES Upgrade", tag: shallowRef(PadesUpgradeComponent) },
-    { name: "PAdES Upgrade V2", tag: shallowRef(PadesUpgradeComponentV2) },
+    
     { name: "CAdES Upgrade", tag: shallowRef(CadesUpgradeComponent) },
+    
+
+    { name: "e-İmza V2", tag: shallowRef(SignComponentV2) },
+    { name: "Mobil İmza V2", tag: shallowRef(MobileSignComponentV2) },
+    { name: "PDF Add Layers V2", tag: shallowRef(PdfAddQrAndVerificationInfoV2) },
+    { name: "PAdES Upgrade V2", tag: shallowRef(PadesUpgradeComponentV2) },
+    { name: "CAdES Upgrade V2", tag: shallowRef(CadesUpgradeComponentV2) },
+    { name: "XAdES Upgrade V2", tag: shallowRef(XadesUpgradeComponentV2) },
+
     { name: "Settings", tag: shallowRef(SettingsComponent) },
 ];
 
@@ -56,9 +68,11 @@ function selectTab(tab: any) {
                     <nav class="-mb-px flex space-y-0 flex-col" aria-label="Tabs">
                         <div v-for="tab in tabs" :key="tab.name" :class="[
                             tab.name === selectedTab.name ? 'border-indigo-500 text-indigo-600 bg-indigo-50' : 'border-transparent hover:bg-indigo-50/50 text-gray-500 hover:border-gray-300 hover:text-gray-700 cursor-pointer',
-                            'whitespace-nowrap border-r-2 py-3 pl-3 pr-3 text-sm font-medium',
+                            'whitespace-nowrap border-r-2 py-3 pl-4  pr-3 text-sm font-medium flex items-center relative ',
                         ]" :aria-current="tab.name === selectedTab.name ? 'page' : undefined" @click="selectTab(tab)">
-                            {{ tab.name }}
+                         
+                         <span>{{ tab.name }}</span>
+                         <StarIcon v-if="tab.name.endsWith('V2')" class="top-4 w-3 h-3 text-indigo-700/70 absolute left-1" />   
                         </div>
                     </nav>
                 </div>
