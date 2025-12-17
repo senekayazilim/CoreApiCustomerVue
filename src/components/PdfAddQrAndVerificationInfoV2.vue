@@ -13,6 +13,14 @@ import store from "@/types/Store";
 const waitString = ref("");
 // yapılan işlemler
 const logs = ref([] as Array<string>);
+const displayedLogs = computed(() => {
+    const original = logs.value;
+    const total = original.length;
+    return original.slice().reverse().map((entry, index) => ({
+        entry,
+        order: total - index,
+    }));
+});
 // primeAPI'de kullanılacak tekil operasyon numarası
 const operationId = ref("");
 // işlemin başarıyla tamamlanıp tamamlanmadığını gösterir
@@ -1012,10 +1020,12 @@ onBeforeUnmount(() => {
                 </div>
             </template>
         </CardComponent>
-        <div class="pt-4 border-t border-gray-200 text-xs" v-if="logs && logs.length > 0">
+        <div class="pt-4 border-t border-gray-200 text-xs" v-if="displayedLogs.length > 0">
             <p class="leading-6 text-sm font-medium">İşlemler</p>
 
-            <p v-for="(logItem, index) in logs.reverse()" :key="index" class=""> {{ logs.length - index }}. {{ logItem }}</p>
+            <p v-for="logItem in displayedLogs" :key="logItem.order" class="">
+                {{ logItem.order }}. {{ logItem.entry }}
+            </p>
         </div>
     </main>
 </template>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "@vue/runtime-core";
+import { computed, ref } from "@vue/runtime-core";
 import axios, { AxiosError } from "axios";
 import { v4 as uuidv4 } from "uuid";
 import { Listbox, ListboxButton, ListboxOption, ListboxOptions, ListboxLabel } from "@headlessui/vue";
@@ -14,6 +14,14 @@ import store from "@/types/Store";
 const waitString = ref("");
 // yapılan işlemler
 const logs = ref([] as Array<string>);
+const displayedLogs = computed(() => {
+    const original = logs.value;
+    const total = original.length;
+    return original.slice().reverse().map((entry, index) => ({
+        entry,
+        order: total - index,
+    }));
+});
 // primeAPI'de kullanılacak tekil operasyon numarası
 const operationId = ref("");
 // imza atarken kullanılacak telefon numarası. 5334440099 şeklinde olmalıdır
@@ -727,10 +735,12 @@ function DownloadFile() {
                 </div>
             </template>
         </CardComponent>
-        <div class="pt-4 border-t border-gray-200 text-xs" v-if="logs && logs.length > 0">
+        <div class="pt-4 border-t border-gray-200 text-xs" v-if="displayedLogs.length > 0">
             <p class="leading-6 text-sm font-medium">İşlemler</p>
 
-            <p v-for="(logItem, index) in logs.reverse()" :key="index" class=""> {{ logs.length - index }}. {{ logItem }}</p>
+            <p v-for="logItem in displayedLogs" :key="logItem.order" class="">
+                {{ logItem.order }}. {{ logItem.entry }}
+            </p>
         </div>
     </main>
 </template>
