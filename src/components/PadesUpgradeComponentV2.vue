@@ -145,7 +145,7 @@ function DownloadFile() {
       }
     })
     .catch((error: Error | AxiosError) => {
-      waitString.value = "Hata oluştu. " + error.message;
+      waitString.value = "Hata oluştu . " + error.message;
     });
 }
 
