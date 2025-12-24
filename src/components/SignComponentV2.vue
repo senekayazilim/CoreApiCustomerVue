@@ -803,6 +803,27 @@ function GetSignatureListXades() {
 
 }
 
+function VerifyPades() {
+
+  waitString.value = "Pades imza doğrulanıyor.";
+  logs.value.push("Sizin sunucu katmanına VerifyPadesV2 isteği gönderiliyor.");
+  // mobil imza işlemi yapılır
+  axios
+    .get(store.API_URL + "/Onaylarim/VerifyPadesV2?operationId=" + operationIdOfFinishSign.value)
+    .then((getSignatureListResponse) => {
+      logs.value.push("Sizin sunucu katmanına GetSignatureListXades isteği gönderildi. Detaylar için console'a bakınız.");
+      console.log("Sizin sunucu katmanına GetSignatureListXades isteği gönderildi.", getSignatureListResponse);
+      const getSignatureListResult = getSignatureListResponse.data as ProxyGetSignatureListResult;
+      signatureList.value = getSignatureListResult.signatures;
+      console.log("getSignatureListResult", getSignatureListResult);
+      waitString.value = "Xades imza listesi alındı.";
+    })
+    .catch((error) => {
+      logs.value.push("Sizin sunucu katmanına GetSignatureListXades isteği gönderilemedi. Mesaj: " + HandleError(error) + " Detaylar için console'a bakınız.");
+      console.log("Sizin sunucu katmanına GetSignatureListXades isteği gönderilemedi.", error);
+    });
+
+}
 
 
 function DownloadFile() {
@@ -844,6 +865,8 @@ function DownloadFile() {
       waitString.value = "Hata oluştu. " + error.message;
     });
 }
+
+
 
 function StepTwoTestConfig() {
   const config = {
@@ -909,13 +932,14 @@ function StepTwoTest() {
           <div class="">
             <div class="text-sm text-gray-700">
               <p>Hangi türde e-imza atılmasını istiyorsanız seçiniz?</p>
-              {{ workingUrl }}
+              <!-- {{ workingUrl }}
               <button
                 class="rounded-md bg-yellow-600 px-2 py-1.5 text-sm font-medium text-white hover:bg-yellow-700 disabled:bg-gray-300 disabled:text-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-800 focus:ring-offset-2 focus:ring-offset-yellow-200"
                 type="button" v-on:click="StepTwoTestConfig()">StepTwoTest Config</button>
                 <button
                 class="rounded-md bg-yellow-600 px-2 py-1.5 text-sm font-medium text-white hover:bg-yellow-700 disabled:bg-gray-300 disabled:text-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-800 focus:ring-offset-2 focus:ring-offset-yellow-200"
-                type="button" v-on:click="StepTwoTest()">StepTwoTest </button>
+                type="button" v-on:click="StepTwoTest()">StepTwoTest </button> -->
+                
             </div>
             <div class="mt-1 flex items-center">
               <fieldset>
@@ -1245,6 +1269,11 @@ function StepTwoTest() {
             class="max-w-2xl text-sm leading-6 text-orange-500 hover:underline cursor-pointer">e-İmzalı
             dosyayı
             indir</p>
+
+            <p v-if="operationIdOfFinishSign && operationIdOfFinishSign.length > 0" @click="VerifyPades()"
+            class="max-w-2xl text-sm leading-6 text-orange-500 hover:underline cursor-pointer">Verify Pades</p>
+
+
         </div>
       </template>
     </CardComponent>
