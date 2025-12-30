@@ -6,7 +6,7 @@ import { Listbox, ListboxButton, ListboxOption, ListboxOptions, ListboxLabel } f
 import { CheckIcon, ChevronUpDownIcon } from "@heroicons/vue/20/solid";
 import { DevicePhoneMobileIcon } from "@heroicons/vue/24/outline";
 import CardComponent from "./CardComponent.vue";
-import { SignatureLevelForPades, SignatureLevelForCades, type ProxyGetFingerPrintRequest, type ProxyMobileSignRequestV2, type ProxyMobilSignResult, type ProxyUploadFileResult, type ProxyGetSignatureListResult, type ProxyGetSignatureListResultItem, SignatureLevelForXades, type ProxyUploadFileResultV2 } from "@/types/Types";
+import { SignatureLevelForPades, SignatureLevelForCades, type ProxyGetFingerPrintRequest, type ProxyMobileSignRequestV2, type ProxyMobilSignResult, type ProxyUploadFileResult, type ProxyGetSignatureListResult, type ProxyGetSignatureListResultItem, SignatureLevelForXades, type ProxyUploadFileResultV2, type ProxyMobilSignResultV2 } from "@/types/Types";
 import { HandleError } from "@/types/HandleError";
 import store from "@/types/Store";
 
@@ -23,7 +23,8 @@ const displayedLogs = computed(() => {
     }));
 });
 // primeAPI'de kullanılacak tekil operasyon numarası
-const operationId = ref("");
+const operationIdOfFileUpload = ref("");
+const operationIdOfMobileSign = ref("");
 // imza atarken kullanılacak telefon numarası. 5334440099 şeklinde olmalıdır
 const phoneNumber = ref("");
 // imza atarken kullanılacak mobil hattın sahibi olan kişinin TC numarası. Eğer bu değer girilmez ise kontrol yapılmaz.
@@ -124,6 +125,8 @@ function onFileSelected(event: Event) {
         selectedFile.value = file;
         selectedFileName.value = file.name;
         logs.value.push(`Sunucuya yüklenecek dosya seçildi: ${file.name}`);
+        operationIdOfMobileSign.value = "";
+        operationIdOfFileUpload.value = "";
         UploadFileToServer();
     } else {
         selectedFile.value = null;
@@ -137,6 +140,8 @@ async function UploadFileToServer() {
         return;
     }
 
+    operationIdOfFileUpload.value = "";
+    operationIdOfMobileSign.value = "";
     const formData = new FormData();
     formData.append("file", selectedFile.value);
     formData.append("filename", selectedFile.value.name);
@@ -152,7 +157,7 @@ async function UploadFileToServer() {
         if (uploadResult?.isSuccess) {
             waitString.value = "Dosya sunucuya başarıyla yüklendi.";
             logs.value.push("Dosya sunucuya başarıyla yüklendi.");
-            operationId.value = uploadResult.operationId;
+            operationIdOfFileUpload.value = uploadResult.operationId;
             console.log("selectedSignatureType.value", selectedSignatureType.value);
             signatureList.value = null;
             if (selectedSignatureType.value.id === "cades") {
@@ -195,7 +200,7 @@ function GetSignatureListPades() {
     logs.value.push("Sizin sunucu katmanına GetSignatureListPades isteği gönderiliyor.");
     // mobil imza işlemi yapılır
     axios
-        .get(store.API_URL + "/Onaylarim/GetSignatureListPadesV2?operationId=" + operationId.value)
+        .get(store.API_URL + "/Onaylarim/GetSignatureListPadesV2?operationId=" + operationIdOfFileUpload.value)
         .then((getSignatureListResponse) => {
             logs.value.push("Sizin sunucu katmanına GetSignatureListPades isteği gönderildi. Detaylar için console'a bakınız.");
             console.log("Sizin sunucu katmanına GetSignatureListPades isteği gönderildi.", getSignatureListResponse);
@@ -218,7 +223,7 @@ function GetSignatureListCades() {
     logs.value.push("Sizin sunucu katmanına GetSignatureListCades isteği gönderiliyor.");
     // mobil imza işlemi yapılır
     axios
-        .get(store.API_URL + "/Onaylarim/GetSignatureListCadesV2?operationId=" + operationId.value)
+        .get(store.API_URL + "/Onaylarim/GetSignatureListCadesV2?operationId=" + operationIdOfFileUpload.value)
         .then((getSignatureListResponse) => {
             logs.value.push("Sizin sunucu katmanına GetSignatureListCades isteği gönderildi. Detaylar için console'a bakınız.");
             console.log("Sizin sunucu katmanına GetSignatureListCades isteği gönderildi.", getSignatureListResponse);
@@ -240,7 +245,7 @@ function GetSignatureListXades() {
     logs.value.push("Sizin sunucu katmanına GetSignatureListXades isteği gönderiliyor.");
     // mobil imza işlemi yapılır
     axios
-        .get(store.API_URL + "/Onaylarim/GetSignatureListXadesV2?operationId=" + operationId.value)
+        .get(store.API_URL + "/Onaylarim/GetSignatureListXadesV2?operationId=" + operationIdOfFileUpload.value)
         .then((getSignatureListResponse) => {
             logs.value.push("Sizin sunucu katmanına GetSignatureListXades isteği gönderildi. Detaylar için console'a bakınız.");
             console.log("Sizin sunucu katmanına GetSignatureListXades isteği gönderildi.", getSignatureListResponse);
@@ -259,6 +264,7 @@ function MobileSignV2() {
 
 
     fingerPrint.value = "";
+    operationIdOfMobileSign.value = "";
 
     const signatureLevelForCades =
         selectedSignatureType.value.id === "cades"
@@ -288,7 +294,7 @@ function MobileSignV2() {
             console.log("selectedCadesSignatureLevel", selectedCadesSignatureLevel);
 
     const mobileSignRequest = {
-        operationId:operationId.value,
+        operationId:operationIdOfFileUpload.value,
         signatureType: selectedSignatureType.value.id,
         phoneNumber: phoneNumber.value,
         operator: selectedOperator.value.id,
@@ -310,21 +316,25 @@ function MobileSignV2() {
         .then((mobileSignResponse) => {
             logs.value.push("Sizin sunucu katmanına MobileSign isteği gönderildi. Detaylar için console'a bakınız.");
             console.log("Sizin sunucu katmanına MobileSign isteği gönderildi.", mobileSignResponse);
-            const mobileSignResult = mobileSignResponse.data as ProxyMobilSignResult;
+            const mobileSignResult = mobileSignResponse.data as ProxyMobilSignResultV2;
             isSuccess.value = mobileSignResult.isSuccess;
             if (mobileSignResult.error) {
                 waitString.value = "İmza işlemi tamamlanamadı. Hata: " + mobileSignResult.error;
             } else {
                 waitString.value = "İmza işlemi tamamlandı.";
             }
+            operationIdOfMobileSign.value = mobileSignResult.operationId || "";
         })
         .catch((error) => {
             logs.value.push("Sizin sunucu katmanına MobileSign isteği gönderilemedi. Mesaj: " + HandleError(error) + " Detaylar için console'a bakınız.");
             console.log("Sizin sunucu katmanına MobileSign isteği gönderilemedi.", error);
         });
     // mobil imza işlemi sürerken işleme ilişkin parmak izi değeri alınır
+    
+    logs.value.push("Sizin sunucu katmanına GetFingerPrintV2 isteği gönderiliyor.");
+    console.log("Sizin sunucu katmanına GetFingerPrintV2 isteği gönderiliyor.", operationIdOfFileUpload.value);
     axios
-        .post(store.API_URL + "/Onaylarim/GetFingerPrint", { operationId: operationId.value } as ProxyGetFingerPrintRequest)
+        .post(store.API_URL + "/Onaylarim/GetFingerPrintV2", { operationId: operationIdOfFileUpload.value } as ProxyGetFingerPrintRequest)
         .then((getFingerResponse) => {
             console.log("getFingerResponse", getFingerResponse);
             fingerPrint.value = getFingerResponse.data.fingerPrint;
@@ -336,8 +346,12 @@ function MobileSignV2() {
 }
 
 function DownloadFile() {
+    if (!operationIdOfMobileSign.value) {
+        waitString.value = "İmza işlemi tamamlanmadan dosya indirilemez.";
+        return;
+    }
     axios
-        .get(store.API_URL + "/Onaylarim/DownloadSignedFileFromOnaylarimApi?operationId=" + operationId.value, { responseType: "blob" })
+        .get(store.API_URL + "/Onaylarim/DownloadSignedFileFromOnaylarimApi?operationId=" + operationIdOfMobileSign.value, { responseType: "blob" })
         .then((e) => {
             if (e.data.error) {
                 waitString.value = "Hata oluştu. " + e.data.error;
@@ -679,7 +693,7 @@ function DownloadFile() {
 
 
 
-                        <button type="button" @click="MobileSignV2()" :disabled="!operationId"
+                        <button type="button" @click="MobileSignV2()" :disabled="!operationIdOfFileUpload"
                             class="rounded-md bg-yellow-600 px-2 py-1.5 text-sm font-medium text-white hover:bg-yellow-700 disabled:bg-gray-300 disabled:text-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-800 focus:ring-offset-2 focus:ring-offset-yellow-200">
                             İmzala
                         </button>
