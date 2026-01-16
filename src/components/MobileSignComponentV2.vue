@@ -6,7 +6,7 @@ import { Listbox, ListboxButton, ListboxOption, ListboxOptions, ListboxLabel } f
 import { CheckIcon, ChevronUpDownIcon } from "@heroicons/vue/20/solid";
 import { DevicePhoneMobileIcon } from "@heroicons/vue/24/outline";
 import CardComponent from "./CardComponent.vue";
-import { SignatureLevelForPades, SignatureLevelForCades, type ProxyGetFingerPrintRequest, type ProxyMobileSignRequestV2, type ProxyMobilSignResult, type ProxyUploadFileResult, type ProxyGetSignatureListResult, type ProxyGetSignatureListResultItem, SignatureLevelForXades, type ProxyUploadFileResultV2, type ProxyMobilSignResultV2 } from "@/types/Types";
+import { SignatureLevelForPades, SignatureLevelForCades, type ProxyGetFingerPrintRequest, type ProxyMobileSignRequestV2, type ProxyMobilSignResult, type ProxyUploadFileResult, type ProxyGetSignatureListResult, type ProxyGetSignatureListResultItem, SignatureLevelForXades, type ProxyUploadFileResultV2, type ProxyMobilSignResultV2, type ProxyGetSignatureListResultItemV3, type ProxyGetSignatureListResultV3 } from "@/types/Types";
 import { HandleError } from "@/types/HandleError";
 import store from "@/types/Store";
 
@@ -34,7 +34,7 @@ const fingerPrint = ref("");
 // işlemin başarıyla tamamlanıp tamamlanmadığını gösterir
 const isSuccess = ref(false);
 // cades imza listesi
-const signatureList = ref(null as Array<ProxyGetSignatureListResultItem> | null);
+const signatureList = ref(null as Array<ProxyGetSignatureListResultItemV3> | null);
 // mobil imza için kullanılacak operatörler. Id değerinde yazan ifade API'ye gönderilir. Bu ifadeler değiştirilmemelidir.
 const operators = [
     { id: "TURKCELL", name: "Turkcell" },
@@ -204,7 +204,7 @@ function GetSignatureListPades() {
         .then((getSignatureListResponse) => {
             logs.value.push("Sizin sunucu katmanına GetSignatureListPades isteği gönderildi. Detaylar için console'a bakınız.");
             console.log("Sizin sunucu katmanına GetSignatureListPades isteği gönderildi.", getSignatureListResponse);
-            const getSignatureListResult = getSignatureListResponse.data as ProxyGetSignatureListResult;
+            const getSignatureListResult = getSignatureListResponse.data as ProxyGetSignatureListResultV3;
             signatureList.value = getSignatureListResult.signatures;
             console.log("getSignatureListResult", getSignatureListResult);
         })
@@ -227,7 +227,7 @@ function GetSignatureListCades() {
         .then((getSignatureListResponse) => {
             logs.value.push("Sizin sunucu katmanına GetSignatureListCades isteği gönderildi. Detaylar için console'a bakınız.");
             console.log("Sizin sunucu katmanına GetSignatureListCades isteği gönderildi.", getSignatureListResponse);
-            const getSignatureListResult = getSignatureListResponse.data as     ProxyGetSignatureListResult;
+            const getSignatureListResult = getSignatureListResponse.data as     ProxyGetSignatureListResultV3;
             signatureList.value = getSignatureListResult.signatures;
             console.log("getSignatureListResult", getSignatureListResult);
         })
@@ -249,7 +249,7 @@ function GetSignatureListXades() {
         .then((getSignatureListResponse) => {
             logs.value.push("Sizin sunucu katmanına GetSignatureListXades isteği gönderildi. Detaylar için console'a bakınız.");
             console.log("Sizin sunucu katmanına GetSignatureListXades isteği gönderildi.", getSignatureListResponse);
-            const getSignatureListResult = getSignatureListResponse.data as ProxyGetSignatureListResult;
+            const getSignatureListResult = getSignatureListResponse.data as ProxyGetSignatureListResultV3;
             signatureList.value = getSignatureListResult.signatures;
             console.log("getSignatureListResult", getSignatureListResult);
         })

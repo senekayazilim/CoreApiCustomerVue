@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document>
+    <title>Örnek XML Dökümanı</title>
+    <content Id="docContent">
+        <paragraph>Bu bir test XML dökümanıdır.</paragraph>
+        <paragraph>SmartCard ile XAdES-XL imzası atılacaktır.</paragraph>
+        <data>
+           
+        </data>
+    </content>
+</document>
+
+
+

@@ -5,7 +5,7 @@ import { Listbox, ListboxButton, ListboxOption, ListboxOptions, ListboxLabel } f
 import { CheckIcon, ChevronUpDownIcon } from "@heroicons/vue/20/solid";
 import { ArrowUpOnSquareIcon } from "@heroicons/vue/24/outline";
 import CardComponent from "./CardComponent.vue";
-import { SignatureLevelForPades, type ProxyGetSignatureListResult, type ProxyGetSignatureListResultItem, type ProxyUploadFileResultV2} from "@/types/Types";
+import { SignatureLevelForPades, type ProxyGetSignatureListResult, type ProxyGetSignatureListResultItem, type ProxyUploadFileResultV2, type ProxyGetSignatureListResultItemV3, type ProxyGetSignatureListResultV3} from "@/types/Types";
 import { HandleError } from "@/types/HandleError";
 import store from "@/types/Store";
 
@@ -29,7 +29,7 @@ const isSuccess = ref(false);
 
 
 // cades imza listesi
-const signatureList = ref([] as Array<ProxyGetSignatureListResultItem>);
+const signatureList = ref([] as Array<ProxyGetSignatureListResultItemV3>);
 // Enum'ı Combo Box için Diziye Çevirme
 const signatureOptions = Object.keys(SignatureLevelForPades).filter((key) => isNaN(Number(key))).map((key) => {
   return {
@@ -109,7 +109,7 @@ function GetSignatureListPades() {
     .then((getSignatureListResponse) => {
       logs.value.push("Sizin sunucu katmanına GetSignatureListPades isteği gönderildi. Detaylar için console'a bakınız.");
       console.log("Sizin sunucu katmanına GetSignatureListPades isteği gönderildi.", getSignatureListResponse);
-      const getSignatureListResult = getSignatureListResponse.data as   ProxyGetSignatureListResult;
+      const getSignatureListResult = getSignatureListResponse.data as   ProxyGetSignatureListResultV3;
       signatureList.value = getSignatureListResult.signatures;
       console.log("getSignatureListResult", getSignatureListResult);
     })

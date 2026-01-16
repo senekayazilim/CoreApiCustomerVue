@@ -6,7 +6,7 @@ import { CheckIcon, ChevronUpDownIcon } from "@heroicons/vue/20/solid";
 import { CpuChipIcon } from "@heroicons/vue/24/outline";
 import { ExclamationTriangleIcon, ComputerDesktopIcon, ArrowDownTrayIcon, LockClosedIcon, CheckBadgeIcon } from "@heroicons/vue/24/outline";
 import CardComponent from "./CardComponent.vue";
-import { SignatureLevelForPades, SignatureLevelForCades, type ProxyUploadFileResult, type ProxyGetSignatureListResult, type ProxyGetSignatureListResultItem, SignatureLevelForXades, type ProxyCreateStateOnOnaylarimApiForPadesRequestV2, type ProxyCreateStateOnOnaylarimApiResult, type ProxyFinishSignForPadesRequestV2, type ProxyFinishSignResult, type ProxyCreateStateOnOnaylarimApiForCadesRequestV2, type ProxyFinishSignForCadesRequestV2, type ProxyFinishSignForXadesRequestV2, type ProxyCreateStateOnOnaylarimApiForXadesRequestV2 } from "@/types/Types";
+import { SignatureLevelForPades, SignatureLevelForCades, type ProxyUploadFileResult, type ProxyGetSignatureListResult, type ProxyGetSignatureListResultItem, SignatureLevelForXades, type ProxyCreateStateOnOnaylarimApiForPadesRequestV2, type ProxyCreateStateOnOnaylarimApiResult, type ProxyFinishSignForPadesRequestV2, type ProxyFinishSignResult, type ProxyCreateStateOnOnaylarimApiForCadesRequestV2, type ProxyFinishSignForCadesRequestV2, type ProxyFinishSignForXadesRequestV2, type ProxyCreateStateOnOnaylarimApiForXadesRequestV2, type ProxyGetSignatureListResultItemV3, type ProxyGetSignatureListResultV3 } from "@/types/Types";
 import { HandleError } from "@/types/HandleError";
 import store from "@/types/Store";
 import type { CertificateInfo, GetSignerAppVersionsResult, SignStepTwoResult, SignerAppPingResult, SignerAppResetResult, WebToAvalonSignStepTwoRequest } from "@/types/AgentTypes";
@@ -29,7 +29,18 @@ const operationIdOfFinishSign = ref("");
 // işlemin başarıyla tamamlanıp tamamlanmadığını gösterir
 const isSuccess = ref(false);
 // imza listesi
-const signatureList = ref(undefined as Array<ProxyGetSignatureListResultItem> | null | undefined);
+const signatureList = ref(undefined as Array<ProxyGetSignatureListResultItemV3> | null | undefined);
+
+function getTimestampedLabel(signature: ProxyGetSignatureListResultItemV3) {
+  if (signature.timestamp) {
+    return "Evet";
+  }
+  return signature.timestamped ? "Evet" : "Hayır";
+}
+
+function getSignatureTimeLabel(signature: ProxyGetSignatureListResultItemV3) {
+  return signature.claimedSigningTimeAsTime ?? signature.claimedSigningTime;
+}
 // e-imza aracı durumu
 const localSignerMode = ref("");
 // kullanıcının seçtiği sertifika
@@ -740,11 +751,11 @@ function GetSignatureListPades() {
   logs.value.push("Sizin sunucu katmanına GetSignatureListPades isteği gönderiliyor.");
   // mobil imza işlemi yapılır
   axios
-    .get(store.API_URL + "/Onaylarim/GetSignatureListPadesV2?operationId=" + operationIdOfFileUpload.value)
+    .get(store.API_URL + "/Onaylarim/GetSignatureListPadesV3?operationId=" + operationIdOfFileUpload.value)
     .then((getSignatureListResponse) => {
       logs.value.push("Sizin sunucu katmanına GetSignatureListPades isteği gönderildi. Detaylar için console'a bakınız.");
       console.log("Sizin sunucu katmanına GetSignatureListPades isteği gönderildi.", getSignatureListResponse);
-      const getSignatureListResult = getSignatureListResponse.data as ProxyGetSignatureListResult;
+      const getSignatureListResult = getSignatureListResponse.data as ProxyGetSignatureListResultV3;
       signatureList.value = getSignatureListResult.signatures;
       waitString.value = "Pades imza listesi alındı.";
       console.log("getSignatureListResult", getSignatureListResult);
@@ -764,11 +775,11 @@ function GetSignatureListCades() {
   logs.value.push("Sizin sunucu katmanına GetSignatureListCades isteği gönderiliyor.");
   // mobil imza işlemi yapılır
   axios
-    .get(store.API_URL + "/Onaylarim/GetSignatureListCadesV2?operationId=" + operationIdOfFileUpload.value)
+    .get(store.API_URL + "/Onaylarim/GetSignatureListCadesV3?operationId=" + operationIdOfFileUpload.value)
     .then((getSignatureListResponse) => {
       logs.value.push("Sizin sunucu katmanına GetSignatureListCades isteği gönderildi. Detaylar için console'a bakınız.");
       console.log("Sizin sunucu katmanına GetSignatureListCades isteği gönderildi.", getSignatureListResponse);
-      const getSignatureListResult = getSignatureListResponse.data as ProxyGetSignatureListResult;
+      const getSignatureListResult = getSignatureListResponse.data as ProxyGetSignatureListResultV3;
       signatureList.value = getSignatureListResult.signatures;
       console.log("getSignatureListResult", getSignatureListResult);
       waitString.value = "Cades imza listesi alındı.";
@@ -787,11 +798,11 @@ function GetSignatureListXades() {
   logs.value.push("Sizin sunucu katmanına GetSignatureListXades isteği gönderiliyor.");
   // mobil imza işlemi yapılır
   axios
-    .get(store.API_URL + "/Onaylarim/GetSignatureListXadesV2?operationId=" + operationIdOfFileUpload.value)
+    .get(store.API_URL + "/Onaylarim/GetSignatureListXadesV3?operationId=" + operationIdOfFileUpload.value)
     .then((getSignatureListResponse) => {
       logs.value.push("Sizin sunucu katmanına GetSignatureListXades isteği gönderildi. Detaylar için console'a bakınız.");
       console.log("Sizin sunucu katmanına GetSignatureListXades isteği gönderildi.", getSignatureListResponse);
-      const getSignatureListResult = getSignatureListResponse.data as ProxyGetSignatureListResult;
+      const getSignatureListResult = getSignatureListResponse.data as ProxyGetSignatureListResultV3;
       signatureList.value = getSignatureListResult.signatures;
       console.log("getSignatureListResult", getSignatureListResult);
       waitString.value = "Xades imza listesi alındı.";
@@ -813,7 +824,7 @@ function VerifyPades() {
     .then((getSignatureListResponse) => {
       logs.value.push("Sizin sunucu katmanına GetSignatureListXades isteği gönderildi. Detaylar için console'a bakınız.");
       console.log("Sizin sunucu katmanına GetSignatureListXades isteği gönderildi.", getSignatureListResponse);
-      const getSignatureListResult = getSignatureListResponse.data as ProxyGetSignatureListResult;
+      const getSignatureListResult = getSignatureListResponse.data as ProxyGetSignatureListResultV3;
       signatureList.value = getSignatureListResult.signatures;
       console.log("getSignatureListResult", getSignatureListResult);
       waitString.value = "Xades imza listesi alındı.";
@@ -1250,9 +1261,15 @@ function StepTwoTest() {
               <p class="text-xs text-black"><span class="text-gray-600">TC No</span> {{
                 signature.citizenshipNo }}</p>
               <p class="text-xs text-black"><span class="text-gray-600">Zaman Damgalı Mı</span>
-                {{ signature.timestamped }}</p>
+                {{ getTimestampedLabel(signature) }}</p>
               <p class="text-xs text-black"><span class="text-gray-600">İmza Tarihi</span> {{
-                signature.claimedSigningTime }}</p>
+                getSignatureTimeLabel(signature) }}</p>
+              <p class="text-xs text-black" v-if="signature.parentEntity"><span class="text-gray-600">Üst İmza</span> {{
+                signature.parentEntity }}</p>
+              <p class="text-xs text-black" v-if="signature.timestamp"><span class="text-gray-600">Zaman Damgası</span>
+                {{ signature.timestamp.entityLabel }}</p>
+              <p class="text-xs text-black" v-if="signature.timestamp"><span class="text-gray-600">Zaman Damgası Tarihi</span>
+                {{ signature.timestamp.timeAsTime ?? signature.timestamp.time }}</p>
               <p class="text-xs text-black" v-if="signature.xadesSignatureType"><span class="text-gray-600">Xades
                   Türü</span> {{
                     signature.xadesSignatureType }}</p>

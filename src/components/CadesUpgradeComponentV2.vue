@@ -5,7 +5,7 @@
   import { CheckIcon, ChevronUpDownIcon } from "@heroicons/vue/20/solid";
   import { ArrowUpOnSquareIcon } from "@heroicons/vue/24/outline";
   import CardComponent from "./CardComponent.vue";
-  import { SignatureLevelForCades, type ProxyUploadFileResult, type ProxyGetSignatureListResult, type ProxyGetSignatureListResultItem, type ProxyUploadFileResultV2 } from "@/types/Types";
+  import { SignatureLevelForCades,  type ProxyGetSignatureListResult, type ProxyGetSignatureListResultItem, type ProxyUploadFileResultV2, type ProxyGetSignatureListResultV3, type ProxyGetSignatureListResultItemV3 } from "@/types/Types";
   import { HandleError } from "@/types/HandleError";
   import store from "@/types/Store";
   
@@ -29,7 +29,7 @@
   
   
   // cades imza listesi
-  const signatureList = ref(undefined as Array<ProxyGetSignatureListResultItem> | null | undefined);
+  const signatureList = ref(undefined as Array<ProxyGetSignatureListResultItemV3> | null | undefined);
   // Enum'ı Combo Box için Diziye Çevirme
   const signatureOptions = Object.keys(SignatureLevelForCades).filter((key) => isNaN(Number(key))).map((key) => {
     return {
@@ -108,11 +108,11 @@
     logs.value.push("Sizin sunucu katmanına GetSignatureListCades isteği gönderiliyor.");
     // mobil imza işlemi yapılır
     axios
-      .get(store.API_URL + "/Onaylarim/GetSignatureListCadesV2?operationId=" + operationIdOfFileUpload.value)
+      .get(store.API_URL + "/Onaylarim/GetSignatureListCadesV3?operationId=" + operationIdOfFileUpload.value)
       .then((getSignatureListResponse) => {
         logs.value.push("Sizin sunucu katmanına GetSignatureListCades isteği gönderildi. Detaylar için console'a bakınız.");
         console.log("Sizin sunucu katmanına GetSignatureListCades isteği gönderildi.", getSignatureListResponse);
-        const getSignatureListResult = getSignatureListResponse.data as ProxyGetSignatureListResult;
+        const getSignatureListResult = getSignatureListResponse.data as ProxyGetSignatureListResultV3;
         signatureList.value = getSignatureListResult.signatures;
         console.log("getSignatureListResult", getSignatureListResult);
         waitString.value = "Cades imza listesi alındı.";

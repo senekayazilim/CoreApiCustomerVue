@@ -7,7 +7,18 @@
     "build": "run-p type-check build-only",
     "preview": "vite preview",
     "build-only": "vite build",
-    "type-check": "vue-tsc --noEmit -p tsconfig.app.json --composite false"
+    "type-check": "vue-tsc --noEmit -p tsconfig.app.json --composite false",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:debug": "playwright test --debug",
+    "test:e2e:report": "playwright show-report",
+    "test:e2e:trace": "playwright show-trace",
+    "test:e2e:failed": "playwright test --last-failed",
+    "test:e2e:clean": "if exist playwright-report rmdir /s /q playwright-report && if exist test-results rmdir /s /q test-results",
+    "test:pades": "playwright test tests/e2e/pades.spec.ts --headed --grep P5",
+    "test:cades": "playwright test tests/e2e/cades.spec.ts --headed --grep C5 && playwright test tests/e2e/cades.spec.ts --headed --grep \"C6|C7\"",
+    "test:all": "npm run test:pades && npm run test:cades"
   },
   "dependencies": {
     "@headlessui/vue": "^1.7.14",
@@ -18,6 +29,7 @@
     "vue": "^3.3.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.57.0",
     "@tailwindcss/forms": "^0.5.3",
     "@tsconfig/node18": "^2.0.1",
     "@types/node": "^18.16.8",

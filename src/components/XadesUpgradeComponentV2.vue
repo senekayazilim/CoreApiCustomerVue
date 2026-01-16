@@ -5,7 +5,7 @@
   import { CheckIcon, ChevronUpDownIcon } from "@heroicons/vue/20/solid";
   import { ArrowUpOnSquareIcon } from "@heroicons/vue/24/outline";
   import CardComponent from "./CardComponent.vue";
-  import { SignatureLevelForXades,  type ProxyGetSignatureListResult, type ProxyGetSignatureListResultItem, type ProxyUploadFileResultV2 } from "@/types/Types";
+  import { SignatureLevelForXades,  type ProxyGetSignatureListResult, type ProxyGetSignatureListResultItem, type ProxyUploadFileResultV2, type ProxyGetSignatureListResultItemV3, type ProxyGetSignatureListResultV3 } from "@/types/Types";
   import { HandleError } from "@/types/HandleError";
   import store from "@/types/Store";
   
@@ -29,7 +29,7 @@
   
   
   // xades imza listesi
-  const signatureList = ref(undefined as Array<ProxyGetSignatureListResultItem> | null | undefined);
+  const signatureList = ref(undefined as Array<ProxyGetSignatureListResultItemV3> | null | undefined);
   // Enum'ı Combo Box için Diziye Çevirme
   const signatureOptions = Object.keys(SignatureLevelForXades).filter((key) => isNaN(Number(key))).map((key) => {
     return {
@@ -112,7 +112,7 @@
       .then((getSignatureListResponse) => {
         logs.value.push("Sizin sunucu katmanına GetSignatureListXades isteği gönderildi. Detaylar için console'a bakınız.");
         console.log("Sizin sunucu katmanına GetSignatureListXades isteği gönderildi.", getSignatureListResponse);
-        const getSignatureListResult = getSignatureListResponse.data as ProxyGetSignatureListResult;
+        const getSignatureListResult = getSignatureListResponse.data as ProxyGetSignatureListResultV3;
         signatureList.value = getSignatureListResult.signatures;
         console.log("getSignatureListResult", getSignatureListResult);
         waitString.value = "Xades imza listesi alındı.";
