@@ -13,6 +13,8 @@ import PadesUpgradeComponentV2 from "./components/PadesUpgradeComponentV2.vue";
 import CadesUpgradeComponent from "./components/CadesUpgradeComponent.vue";
 import CadesUpgradeComponentV2 from "./components/CadesUpgradeComponentV2.vue";
 import XadesUpgradeComponentV2 from "./components/XadesUpgradeComponentV2.vue";
+import StatsComponent from "./components/StatsComponent.vue";
+import OperationsComponent from "./components/OperationsComponent.vue";
 import { StarIcon } from "@heroicons/vue/20/solid";
 
 const tabs = [
@@ -35,6 +37,8 @@ const tabs = [
     { name: "CAdES Upgrade V2", tag: shallowRef(CadesUpgradeComponentV2) },
     { name: "XAdES Upgrade V2", tag: shallowRef(XadesUpgradeComponentV2) },
 
+    { name: "İstatistikler", tag: shallowRef(StatsComponent) },
+    { name: "İşlemler", tag: shallowRef(OperationsComponent) },
     { name: "Settings", tag: shallowRef(SettingsComponent) },
 ];
 

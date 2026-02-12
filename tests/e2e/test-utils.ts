@@ -162,6 +162,11 @@ export const TEST_CERTIFICATES: Record<string, Certificate> = {
   },
   
   BULENT: {
+    name: 'ULUÇ EFE ÖZTÜRK',
+    tcNo: '14495523968',
+    pin: '123987', // WARNING: Don't commit real PINs to public repos!
+  },
+   BULENTOLD: {
     name: 'BÜLENT DAYIOĞLU',
     tcNo: '20206372664',
     pin: '0606', // WARNING: Don't commit real PINs to public repos!
