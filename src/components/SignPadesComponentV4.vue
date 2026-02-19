@@ -7,17 +7,19 @@ import { CpuChipIcon } from "@heroicons/vue/24/outline";
 import { ExclamationTriangleIcon, ComputerDesktopIcon, ArrowDownTrayIcon, LockClosedIcon, CheckBadgeIcon } from "@heroicons/vue/24/outline";
 import CardComponent from "./CardComponent.vue";
 import {
-  SignatureLevelForCadesV4,
-  CadesProfileV4,
+  SignatureLevelForPadesV4,
+  PadesProfileV4,
   CadesHashAlgorithmV4,
-  type ProxyCreateStateOnOnaylarimApiForCadesRequestV4,
+  type ProxyCreateStateOnOnaylarimApiForPadesRequestV4,
   type ProxyCreateStateOnOnaylarimApiResult,
-  type ProxyFinishSignForCadesRequestV4,
+  type ProxyFinishSignForPadesRequestV4,
   type ProxyFinishSignResult,
   type ProxyUploadFileResult,
-  type ProxyGetSignatureListCadesRequestV4,
-  type ProxyGetSignatureListCadesResultV4,
-  type ProxyCadesSignatureInfoV4,
+  type ProxyGetSignatureListPadesRequestV4,
+  type ProxyGetSignatureListPadesResultV4,
+  type ProxyPadesSignatureInfoV4,
+  type ProxySignatureWidgetInfo,
+  type ProxyLineInfo,
 } from "@/types/Types";
 import { HandleError } from "@/types/HandleError";
 import store from "@/types/Store";
@@ -47,9 +49,7 @@ const operationIdOfFinishSign = ref("");
 const isSuccess = ref(false);
 
 // İmza listesi
-const signatureList = ref(undefined as Array<ProxyCadesSignatureInfoV4> | null | undefined);
-const isFileDetached = ref(false);
-const originalFileOperationId = ref(null as string | null);
+const signatureList = ref(undefined as Array<ProxyPadesSignatureInfoV4> | null | undefined);
 
 // e-İmza aracı durumu
 const localSignerMode = ref("");
@@ -68,20 +68,20 @@ const selectedFileName = ref("");
 // ═══════════════════════════════════════════════════════════════
 
 // İmza seviyesi
-const signatureLevelOptions = Object.keys(SignatureLevelForCadesV4)
+const signatureLevelOptions = Object.keys(SignatureLevelForPadesV4)
   .filter((key) => isNaN(Number(key)))
   .map((key) => ({
     label: key,
-    value: SignatureLevelForCadesV4[key as keyof typeof SignatureLevelForCadesV4],
+    value: SignatureLevelForPadesV4[key as keyof typeof SignatureLevelForPadesV4],
   }));
 const selectedSignatureLevel = ref(signatureLevelOptions[0]);
 
 // Profil
-const profileOptions = Object.keys(CadesProfileV4)
+const profileOptions = Object.keys(PadesProfileV4)
   .filter((key) => isNaN(Number(key)))
   .map((key) => ({
     label: key,
-    value: CadesProfileV4[key as keyof typeof CadesProfileV4],
+    value: PadesProfileV4[key as keyof typeof PadesProfileV4],
   }));
 const selectedProfile = ref(profileOptions[0]);
 
@@ -94,18 +94,32 @@ const hashAlgorithmOptions = Object.keys(CadesHashAlgorithmV4)
   }));
 const selectedHashAlgorithm = ref(hashAlgorithmOptions[0]);
 
-// Seri/Paralel
-const serialOrParallelOptions = [
-  { id: "SERIAL", title: "Seri" },
-  { id: "PARALLEL", title: "Paralel" },
-];
-const selectedSerialOrParallel = ref(serialOrParallelOptions[0]);
-
-// İmza yolu
-const signaturePath = ref(null as string | null);
-
-// Detached imza
-const isDetached = ref(false);
+// Görsel imza
+const useVisibleSignature = ref(false);
+const signatureWidgetInfo = ref<ProxySignatureWidgetInfo>({
+  width: 200,
+  height: 50,
+  left: 0.1,
+  right: 0.5,
+  top: 0.1,
+  bottom: 0.2,
+  transformOrigin: "",
+  imageBytes: [],
+  pagesToPlaceOn: [1],
+  lines: [
+    {
+      text: "İmzalandı",
+      leftMargin: 2,
+      topMargin: 2,
+      bottomMargin: 2,
+      rightMargin: 2,
+      fontName: "Arial",
+      fontSize: 10,
+      fontStyle: "Regular",
+      colorHtml: "#000000",
+    },
+  ],
+});
 
 // ═══════════════════════════════════════════════════════════════
 // LIFECYCLE
@@ -267,10 +281,7 @@ async function UploadFileToServer() {
   operationIdOfFinishSign.value = "";
   operationIdOfSignStepOne.value = "";
   signatureList.value = undefined;
-  isFileDetached.value = false;
-  originalFileOperationId.value = null;
   isSuccess.value = false;
-  signaturePath.value = null;
   waitString.value = "";
 
   const formData = new FormData();
@@ -289,7 +300,7 @@ async function UploadFileToServer() {
       waitString.value = "Dosya sunucuya başarıyla yüklendi.";
       logs.value.push("Dosya sunucuya başarıyla yüklendi.");
       operationIdOfFileUpload.value = uploadResult.operationId;
-      GetSignatureListCadesV4();
+      GetSignatureListPadesV4();
     } else {
       const errorMessage = uploadResult?.error || "Dosya yüklemesi başarısız oldu.";
       waitString.value = errorMessage;
@@ -305,32 +316,29 @@ async function UploadFileToServer() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// CADES V4 İMZALAMA
+// PADES V4 İMZALAMA
 // ═══════════════════════════════════════════════════════════════
 
-async function SignCadesV4(certificate: CertificateInfo) {
+async function SignPadesV4(certificate: CertificateInfo) {
   operationIdOfFinishSign.value = "";
   isSuccess.value = false;
 
   try {
     // Adım 1: CreateState
     waitString.value = "İmza işlemi hazırlanıyor.";
-    logs.value.push("CreateStateOnOnaylarimApiForCadesV4 isteği gönderiliyor.");
+    logs.value.push("CreateStateOnOnaylarimApiForPadesV4 isteği gönderiliyor.");
 
-    const createRequest: ProxyCreateStateOnOnaylarimApiForCadesRequestV4 = {
+    const createRequest: ProxyCreateStateOnOnaylarimApiForPadesRequestV4 = {
       certificate: certificate.data,
       operationId: operationIdOfFileUpload.value,
-      serialOrParallel: selectedSerialOrParallel.value.id,
-      signaturePath: signaturePath.value,
       signatureLevel: selectedSignatureLevel.value.value,
       profile: selectedProfile.value.value,
       hashAlgorithm: selectedHashAlgorithm.value.value,
-      detached: isDetached.value,
-      originalFileOperationId: isFileDetached.value ? originalFileOperationId.value : null,
+      signatureWidgetInfo: useVisibleSignature.value ? signatureWidgetInfo.value : null,
     };
 
     const createResponse = await axios.post(
-      store.API_URL + "/Onaylarim/CreateStateOnOnaylarimApiForCadesV4",
+      store.API_URL + "/Onaylarim/CreateStateOnOnaylarimApiForPadesV4",
       createRequest
     );
 
@@ -338,12 +346,12 @@ async function SignCadesV4(certificate: CertificateInfo) {
     console.log("createStateOnOnaylarimApiResult", createResult);
 
     if (createResult.error !== undefined && createResult.error !== null && createResult.error.length > 0) {
-      logs.value.push("CreateStateOnOnaylarimApiForCadesV4 hata döndü. Hata: " + createResult.error);
+      logs.value.push("CreateStateOnOnaylarimApiForPadesV4 hata döndü. Hata: " + createResult.error);
       waitString.value = "Hata: " + createResult.error;
       return;
     }
 
-    logs.value.push("CreateStateOnOnaylarimApiForCadesV4 başarılı. Detaylar için console'a bakınız.");
+    logs.value.push("CreateStateOnOnaylarimApiForPadesV4 başarılı. Detaylar için console'a bakınız.");
     operationIdOfSignStepOne.value = createResult.operationId;
 
     // Adım 2: e-İmza aracı ile imzalama
@@ -376,9 +384,9 @@ async function SignCadesV4(certificate: CertificateInfo) {
 
     // Adım 3: FinishSign
     waitString.value = "İmza tamamlanıyor.";
-    logs.value.push("FinishSignForCadesV4 isteği gönderiliyor.");
+    logs.value.push("FinishSignForPadesV4 isteği gönderiliyor.");
 
-    const finishRequest: ProxyFinishSignForCadesRequestV4 = {
+    const finishRequest: ProxyFinishSignForPadesRequestV4 = {
       signedData: signResult.signedData,
       keyId: createResult.keyID,
       keySecret: createResult.keySecret,
@@ -386,7 +394,7 @@ async function SignCadesV4(certificate: CertificateInfo) {
     };
 
     const finishResponse = await axios.post(
-      store.API_URL + "/Onaylarim/FinishSignForCadesV4",
+      store.API_URL + "/Onaylarim/FinishSignForPadesV4",
       finishRequest
     );
 
@@ -398,13 +406,13 @@ async function SignCadesV4(certificate: CertificateInfo) {
       logs.value.push("İmza işlemi başarılı.");
     } else {
       waitString.value = "İmza işlemi tamamlanamadı.";
-      logs.value.push("FinishSignForCadesV4 başarısız.");
+      logs.value.push("FinishSignForPadesV4 başarısız.");
     }
   } catch (error) {
     const normalizedError = error instanceof Error ? error : new Error(String(error));
     waitString.value = "Hata oluştu: " + HandleError(normalizedError);
     logs.value.push("Hata: " + HandleError(normalizedError));
-    console.error("SignCadesV4 error", error);
+    console.error("SignPadesV4 error", error);
   }
 }
 
@@ -424,43 +432,37 @@ function handleSignStepTwoError(result: SignStepTwoResult) {
 // İMZA LİSTESİ SORGULAMA
 // ═══════════════════════════════════════════════════════════════
 
-async function GetSignatureListCadesV4() {
+async function GetSignatureListPadesV4() {
   try {
-    waitString.value = "CAdES imza listesi alınıyor.";
-    logs.value.push("GetSignatureListCadesV4 isteği gönderiliyor.");
+    waitString.value = "PAdES imza listesi alınıyor.";
+    logs.value.push("GetSignatureListPadesV4 isteği gönderiliyor.");
 
-    const request: ProxyGetSignatureListCadesRequestV4 = {
+    const request: ProxyGetSignatureListPadesRequestV4 = {
       operationId: operationIdOfFileUpload.value,
-      originalFileOperationId: originalFileOperationId.value,
     };
 
     const response = await axios.post(
-      store.API_URL + "/Onaylarim/GetSignatureListCadesV4",
+      store.API_URL + "/Onaylarim/GetSignatureListPadesV4",
       request
     );
 
-    const result = response.data as ProxyGetSignatureListCadesResultV4;
-    console.log("getSignatureListCadesV4Result", result);
+    const result = response.data as ProxyGetSignatureListPadesResultV4;
+    console.log("getSignatureListPadesV4Result", result);
 
     if (result.error !== undefined && result.error !== null && result.error.length > 0) {
       waitString.value = "İmza listesi alınamadı: " + result.error;
-      logs.value.push("GetSignatureListCadesV4 hata: " + result.error);
+      logs.value.push("GetSignatureListPadesV4 hata: " + result.error);
       signatureList.value = null;
     } else {
       signatureList.value = result.signatures;
-      isFileDetached.value = result.isDetached;
-      if (result.isDetached) {
-        isDetached.value = true;
-        logs.value.push("Dosya detached imza içeriyor. Orijinal dosyanın OperationId'si gerekecek.");
-      }
-      waitString.value = "CAdES imza listesi alındı.";
-      logs.value.push("GetSignatureListCadesV4 başarılı.");
+      waitString.value = "PAdES imza listesi alındı.";
+      logs.value.push("GetSignatureListPadesV4 başarılı.");
     }
   } catch (error) {
     const normalizedError = error instanceof Error ? error : new Error(String(error));
     waitString.value = "İmza listesi alınamadı. " + HandleError(normalizedError);
-    logs.value.push("GetSignatureListCadesV4 hata: " + HandleError(normalizedError));
-    console.error("GetSignatureListCadesV4 error", error);
+    logs.value.push("GetSignatureListPadesV4 hata: " + HandleError(normalizedError));
+    console.error("GetSignatureListPadesV4 error", error);
   }
 }
 
@@ -480,7 +482,7 @@ async function DownloadFile() {
       return;
     }
 
-    let filename = "dosya.p7s";
+    let filename = "dosya.pdf";
     const contentDisposition = response.headers["content-disposition"];
     if (contentDisposition) {
       const match = contentDisposition.match(/filename[^;\n]*=(UTF-\d['"]*)?((['"]).*?[.]$\2|[^;\n]*)?/gi);
@@ -509,14 +511,14 @@ async function DownloadFile() {
 // HELPER FONKSİYONLAR
 // ═══════════════════════════════════════════════════════════════
 
-function getTimestampedLabel(signature: ProxyCadesSignatureInfoV4) {
+function getTimestampedLabel(signature: ProxyPadesSignatureInfoV4) {
   if (signature.timestamp) {
     return "Evet";
   }
   return signature.timestamped ? "Evet" : "Hayır";
 }
 
-function getSignatureTimeLabel(signature: ProxyCadesSignatureInfoV4) {
+function getSignatureTimeLabel(signature: ProxyPadesSignatureInfoV4) {
   return signature.claimedSigningTimeAsTime ?? signature.claimedSigningTime;
 }
 </script>
@@ -524,7 +526,7 @@ function getSignatureTimeLabel(signature: ProxyCadesSignatureInfoV4) {
 <template>
   <main class="space-y-4">
     <!-- Card 1: Ana Ayarlar -->
-    <CardComponent title="e-İmza CAdES V4">
+    <CardComponent title="e-İmza PAdES V4">
       <template v-slot:icon>
         <CpuChipIcon></CpuChipIcon>
       </template>
@@ -538,30 +540,16 @@ function getSignatureTimeLabel(signature: ProxyCadesSignatureInfoV4) {
 
                   <!-- Dosya Seçimi -->
                   <div class="mt-2 max-w-sm">
-                    <label for="uploadFileV4" class="block text-sm/6 font-medium text-gray-900 dark:text-white">İmzalanacak Dosya</label>
+                    <label for="uploadFilePadesV4" class="block text-sm/6 font-medium text-gray-900 dark:text-white">İmzalanacak PDF Dosya</label>
                     <div class="mt-1 flex items-center gap-3 rounded-md border-0 py-1.5 pl-0 pr-3 text-gray-900">
-                      <input id="uploadFileV4" name="uploadFileV4" type="file" class="sr-only" @change="onFileSelected" />
-                      <label for="uploadFileV4"
+                      <input id="uploadFilePadesV4" name="uploadFilePadesV4" type="file" accept=".pdf" class="sr-only" @change="onFileSelected" />
+                      <label for="uploadFilePadesV4"
                         class="flex-shrink-0 rounded-md bg-yellow-600 px-3 py-1.5 text-sm font-medium text-white cursor-pointer hover:bg-yellow-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-600 focus-visible:ring-offset-2 focus-visible:ring-offset-white">
                         Dosya seç
                       </label>
                       <span class="text-sm text-gray-500 truncate" :class="{ 'text-gray-400': !selectedFileName }">
                         {{ selectedFileName || "Seçili dosya yok" }}
                       </span>
-                    </div>
-                  </div>
-
-                  <!-- Detached dosya uyarısı -->
-                  <div v-if="isFileDetached" class="mt-2 max-w-sm p-2 bg-yellow-50 border border-yellow-200 rounded-md">
-                    <p class="text-xs text-yellow-800 mb-1">Bu dosya detached imza içeriyor. İmza atabilmek için orijinal dosyanın OperationId'sini giriniz.</p>
-                    <div class="flex items-center gap-2">
-                      <input type="text" v-model="originalFileOperationId" autocomplete="off"
-                        class="block w-full rounded-md border-0 py-1 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-yellow-600 sm:text-sm sm:leading-6"
-                        placeholder="Orijinal Dosya OperationId" />
-                      <button type="button" @click="GetSignatureListCadesV4()"
-                        class="flex-shrink-0 rounded-md bg-yellow-100 px-2 py-1 text-xs font-medium text-yellow-800 hover:bg-yellow-200 focus:outline-none focus:ring-2 focus:ring-yellow-600">
-                        Yenile
-                      </button>
                     </div>
                   </div>
 
@@ -646,60 +634,87 @@ function getSignatureTimeLabel(signature: ProxyCadesSignatureInfoV4) {
                     </div>
                   </Listbox>
 
-                  <!-- Seri/Paralel -->
-                  <Listbox as="div" v-model="selectedSerialOrParallel" class="max-w-sm mt-2">
-                    <ListboxLabel class="block text-sm/6 font-medium text-gray-900 dark:text-white">İmza Metodu</ListboxLabel>
-                    <div class="relative mt-0">
-                      <ListboxButton
-                        class="relative w-full cursor-default rounded-md bg-white py-1.5 pl-3 pr-10 text-left text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:outline-none focus:ring-2 focus:ring-yellow-600 sm:text-sm sm:leading-6">
-                        <span class="block truncate">{{ selectedSerialOrParallel.title }}</span>
-                        <span class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                          <ChevronUpDownIcon class="h-5 w-5 text-gray-400" aria-hidden="true" />
-                        </span>
-                      </ListboxButton>
-                      <transition leave-active-class="transition ease-in duration-100" leave-from-class="opacity-100" leave-to-class="opacity-0">
-                        <ListboxOptions
-                          class="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
-                          <ListboxOption as="template" v-for="option in serialOrParallelOptions" :key="option.id" :value="option" v-slot="{ active, selected }">
-                            <li :class="[active ? 'bg-yellow-600 text-white' : 'text-gray-900', 'relative cursor-default select-none py-2 pl-3 pr-9']">
-                              <span :class="[selected ? 'font-semibold' : 'font-normal', 'block truncate']">{{ option.title }}</span>
-                              <span v-if="selected" :class="[active ? 'text-white' : 'text-yellow-600', 'absolute inset-y-0 right-0 flex items-center pr-4']">
-                                <CheckIcon class="h-5 w-5" aria-hidden="true" />
-                              </span>
-                            </li>
-                          </ListboxOption>
-                        </ListboxOptions>
-                      </transition>
-                    </div>
-                  </Listbox>
-
-                  <!-- Detached İmza -->
+                  <!-- Görsel İmza -->
                   <div class="mt-3 max-w-sm">
                     <div class="flex items-center">
-                      <input id="isDetached" name="isDetached" type="checkbox" v-model="isDetached" :disabled="isFileDetached"
-                        class="h-4 w-4 rounded border-gray-300 text-yellow-600 focus:ring-yellow-600 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" />
-                      <label for="isDetached" class="ml-3 block text-sm font-medium leading-6 text-gray-900 cursor-pointer">Detached İmza</label>
-                      <span v-if="isFileDetached" class="ml-2 text-xs text-gray-400">(dosya detached olduğu için zorunlu)</span>
+                      <input id="useVisibleSignature" name="useVisibleSignature" type="checkbox" v-model="useVisibleSignature"
+                        class="h-4 w-4 rounded border-gray-300 text-yellow-600 focus:ring-yellow-600 cursor-pointer" />
+                      <label for="useVisibleSignature" class="ml-3 block text-sm font-medium leading-6 text-gray-900 cursor-pointer">Görsel İmza</label>
                     </div>
                   </div>
 
-                  <!-- İmza Yolu -->
-                  <div class="mt-2 max-w-sm" v-if="signatureList && signatureList.length > 0">
-                    <label for="signaturePath" class="block text-sm/6 font-medium text-gray-900 dark:text-white">Üstüne İmza Atılacak İmza Adı</label>
-                    <input type="text" name="signaturePath" id="signaturePath" v-model="signaturePath" autocomplete="off"
-                      class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-yellow-600 sm:text-sm sm:leading-6"
-                      placeholder="S0:S0" />
+                  <!-- Görsel İmza Ayarları -->
+                  <div v-if="useVisibleSignature" class="mt-2 max-w-sm p-3 bg-gray-50 border border-gray-200 rounded-md space-y-2">
+                    <p class="text-xs font-medium text-gray-700">Görsel İmza Ayarları</p>
+                    <div class="grid grid-cols-2 gap-2">
+                      <div>
+                        <label class="block text-xs text-gray-600">Genişlik (px)</label>
+                        <input type="number" v-model.number="signatureWidgetInfo.width"
+                          class="block w-full rounded-md border-0 py-1 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-yellow-600 sm:text-xs sm:leading-6" />
+                      </div>
+                      <div>
+                        <label class="block text-xs text-gray-600">Yükseklik (px)</label>
+                        <input type="number" v-model.number="signatureWidgetInfo.height"
+                          class="block w-full rounded-md border-0 py-1 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-yellow-600 sm:text-xs sm:leading-6" />
+                      </div>
+                      <div>
+                        <label class="block text-xs text-gray-600">Sol (oran)</label>
+                        <input type="number" step="0.01" v-model.number="signatureWidgetInfo.left"
+                          class="block w-full rounded-md border-0 py-1 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-yellow-600 sm:text-xs sm:leading-6" />
+                      </div>
+                      <div>
+                        <label class="block text-xs text-gray-600">Sağ (oran)</label>
+                        <input type="number" step="0.01" v-model.number="signatureWidgetInfo.right"
+                          class="block w-full rounded-md border-0 py-1 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-yellow-600 sm:text-xs sm:leading-6" />
+                      </div>
+                      <div>
+                        <label class="block text-xs text-gray-600">Üst (oran)</label>
+                        <input type="number" step="0.01" v-model.number="signatureWidgetInfo.top"
+                          class="block w-full rounded-md border-0 py-1 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-yellow-600 sm:text-xs sm:leading-6" />
+                      </div>
+                      <div>
+                        <label class="block text-xs text-gray-600">Alt (oran)</label>
+                        <input type="number" step="0.01" v-model.number="signatureWidgetInfo.bottom"
+                          class="block w-full rounded-md border-0 py-1 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-yellow-600 sm:text-xs sm:leading-6" />
+                      </div>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-gray-600">Sayfa Numaraları (virgülle ayırın)</label>
+                      <input type="text" :value="signatureWidgetInfo.pagesToPlaceOn.join(',')"
+                        @input="signatureWidgetInfo.pagesToPlaceOn = ($event.target as HTMLInputElement).value.split(',').filter(s => s.trim()).map(Number)"
+                        class="block w-full rounded-md border-0 py-1 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-yellow-600 sm:text-xs sm:leading-6"
+                        placeholder="1" />
+                    </div>
+                    <div>
+                      <label class="block text-xs text-gray-600">İmza Metni</label>
+                      <input type="text" v-model="signatureWidgetInfo.lines[0].text"
+                        class="block w-full rounded-md border-0 py-1 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-yellow-600 sm:text-xs sm:leading-6"
+                        placeholder="İmzalandı" />
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                      <div>
+                        <label class="block text-xs text-gray-600">Font</label>
+                        <input type="text" v-model="signatureWidgetInfo.lines[0].fontName"
+                          class="block w-full rounded-md border-0 py-1 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-yellow-600 sm:text-xs sm:leading-6" />
+                      </div>
+                      <div>
+                        <label class="block text-xs text-gray-600">Font Boyutu</label>
+                        <input type="number" v-model.number="signatureWidgetInfo.lines[0].fontSize"
+                          class="block w-full rounded-md border-0 py-1 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-yellow-600 sm:text-xs sm:leading-6" />
+                      </div>
+                    </div>
                   </div>
-<div class="mt-3 max-w-sm">
-                  <button type="button" @click="TryToConnect()"
-                  class="rounded-md bg-yellow-600 px-2 py-1.5 text-sm font-medium text-white hover:bg-yellow-700 disabled:bg-gray-300 disabled:text-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-800 focus:ring-offset-2 focus:ring-offset-yellow-200">
-                  Başla
-                </button>
-                </div>
+
+                  <div class="mt-3 max-w-sm">
+                    <button type="button" @click="TryToConnect()"
+                      class="rounded-md bg-yellow-600 px-2 py-1.5 text-sm font-medium text-white hover:bg-yellow-700 disabled:bg-gray-300 disabled:text-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-800 focus:ring-offset-2 focus:ring-offset-yellow-200">
+                      Başla
+                    </button>
+                  </div>
 
                 </div>
               </div>
-              
+
             </div>
 
             <!-- Durum Mesajı -->
@@ -722,7 +737,7 @@ function getSignatureTimeLabel(signature: ProxyCadesSignatureInfoV4) {
               </div>
               <div v-else-if="signatureList === null || signatureList.length === 0">
                 <div class="text-sm text-gray-700 mt-2">
-                  <p>Belgede CAdES türünde imza bulunmuyor.</p>
+                  <p>Belgede PAdES türünde imza bulunmuyor.</p>
                 </div>
               </div>
               <div class="space-y-4 mt-2" v-else>
@@ -736,9 +751,7 @@ function getSignatureTimeLabel(signature: ProxyCadesSignatureInfoV4) {
                   <p class="text-xs text-black" v-if="signature.profileName"><span class="text-gray-600">Profil</span> {{ signature.profileName }}</p>
                   <p class="text-xs text-black" v-if="signature.hashAlgorithm"><span class="text-gray-600">Hash Algoritması</span> {{ signature.hashAlgorithm }}</p>
                   <p class="text-xs text-black" v-if="signature.policyOID"><span class="text-gray-600">Policy OID</span> {{ signature.policyOID }}</p>
-                  <p class="text-xs text-black" v-if="signature.parentEntity"><span class="text-gray-600">Üst İmza</span> {{ signature.parentEntity }}</p>
                   <p class="text-xs text-black"><span class="text-gray-600">Uzun Vadeli Bilgi</span> {{ signature.containsLongTermInfo ? "Evet" : "Hayır" }}</p>
-                  <p class="text-xs text-black" v-if="signature.lastArchivalTime"><span class="text-gray-600">Son Arşiv Zamanı</span> {{ signature.lastArchivalTime }}</p>
                   <p class="text-xs text-black" v-if="signature.timestamp"><span class="text-gray-600">Zaman Damgası</span> {{ signature.timestamp.entityLabel }}</p>
                   <p class="text-xs text-black" v-if="signature.timestamp"><span class="text-gray-600">Zaman Damgası Tarihi</span> {{ signature.timestamp.timeAsTime ?? signature.timestamp.time }}</p>
                   <p class="text-xs text-black" v-if="signature.timestamp?.tSAName"><span class="text-gray-600">TSA</span> {{ signature.timestamp.tSAName }}</p>
@@ -863,7 +876,7 @@ function getSignatureTimeLabel(signature: ProxyCadesSignatureInfoV4) {
                           class="block w-full rounded-none rounded-l-md border-0 py-1.5 pl-10 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-yellow-600 sm:text-sm sm:leading-6"
                           placeholder="PIN" />
                       </div>
-                      <button @click="SignCadesV4(certificate)" type="button"
+                      <button @click="SignPadesV4(certificate)" type="button"
                         class="relative -ml-px inline-flex items-center gap-x-1.5 rounded-r-md px-3 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
                         <CheckBadgeIcon class="-ml-0.5 h-5 w-5 text-gray-400" aria-hidden="true" />
                         İmzala

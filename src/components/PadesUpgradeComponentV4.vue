@@ -6,12 +6,12 @@ import { CheckIcon, ChevronUpDownIcon } from "@heroicons/vue/20/solid";
 import { ArrowUpOnSquareIcon } from "@heroicons/vue/24/outline";
 import CardComponent from "./CardComponent.vue";
 import {
-  SignatureLevelForCadesV4,
+  SignatureLevelForPadesV4,
   type ProxyUploadFileResult,
-  type ProxyGetSignatureListCadesRequestV4,
-  type ProxyGetSignatureListCadesResultV4,
-  type ProxyCadesSignatureInfoV4,
-  type ProxyUpgradeCadesRequestV4,
+  type ProxyGetSignatureListPadesRequestV4,
+  type ProxyGetSignatureListPadesResultV4,
+  type ProxyPadesSignatureInfoV4,
+  type ProxyUpgradePadesRequestV4,
 } from "@/types/Types";
 import { HandleError } from "@/types/HandleError";
 import store from "@/types/Store";
@@ -31,15 +31,14 @@ const operationIdOfUpgrade = ref("");
 const isSuccess = ref(false);
 
 // İmza listesi
-const signatureList = ref(undefined as Array<ProxyCadesSignatureInfoV4> | null | undefined);
-const isFileDetached = ref(false);
+const signatureList = ref(undefined as Array<ProxyPadesSignatureInfoV4> | null | undefined);
 
 // İmza seviyesi (upgrade hedef seviyesi)
-const signatureLevelOptions = Object.keys(SignatureLevelForCadesV4)
+const signatureLevelOptions = Object.keys(SignatureLevelForPadesV4)
   .filter((key) => isNaN(Number(key)))
   .map((key) => ({
     label: key,
-    value: SignatureLevelForCadesV4[key as keyof typeof SignatureLevelForCadesV4],
+    value: SignatureLevelForPadesV4[key as keyof typeof SignatureLevelForPadesV4],
   }));
 const selectedTargetLevel = ref(signatureLevelOptions[0]);
 
@@ -48,9 +47,6 @@ const selectedFileName = ref("");
 
 // Upgrade edilecek imza yolu
 const signaturePath = ref(null as string | null);
-
-// Detached imzalar için orijinal dosyanın operationId'si
-const originalFileOperationId = ref(null as string | null);
 
 // ═══════════════════════════════════════════════════════════════
 // DOSYA YÜKLEME
@@ -66,12 +62,10 @@ function onFileSelected(event: Event) {
 
     // State reset
     signatureList.value = undefined;
-    isFileDetached.value = false;
     operationIdOfUpgrade.value = "";
     operationIdOfFileUpload.value = "";
     isSuccess.value = false;
     signaturePath.value = null;
-    originalFileOperationId.value = null;
     waitString.value = "";
 
     UploadFileToServer();
@@ -103,7 +97,7 @@ async function UploadFileToServer() {
       waitString.value = "Dosya sunucuya başarıyla yüklendi.";
       logs.value.push("Dosya sunucuya başarıyla yüklendi.");
       operationIdOfFileUpload.value = uploadResult.operationId;
-      GetSignatureListCadesV4();
+      GetSignatureListPadesV4();
     } else {
       const errorMessage = uploadResult?.error || "Dosya yüklemesi başarısız oldu.";
       waitString.value = errorMessage;
@@ -122,42 +116,37 @@ async function UploadFileToServer() {
 // İMZA LİSTESİ SORGULAMA
 // ═══════════════════════════════════════════════════════════════
 
-async function GetSignatureListCadesV4() {
+async function GetSignatureListPadesV4() {
   try {
-    waitString.value = "CAdES imza listesi alınıyor.";
-    logs.value.push("GetSignatureListCadesV4 isteği gönderiliyor.");
+    waitString.value = "PAdES imza listesi alınıyor.";
+    logs.value.push("GetSignatureListPadesV4 isteği gönderiliyor.");
 
-    const request: ProxyGetSignatureListCadesRequestV4 = {
+    const request: ProxyGetSignatureListPadesRequestV4 = {
       operationId: operationIdOfFileUpload.value,
-      originalFileOperationId: originalFileOperationId.value,
     };
 
     const response = await axios.post(
-      store.API_URL + "/Onaylarim/GetSignatureListCadesV4",
+      store.API_URL + "/Onaylarim/GetSignatureListPadesV4",
       request
     );
 
-    const result = response.data as ProxyGetSignatureListCadesResultV4;
-    console.log("getSignatureListCadesV4Result", result);
+    const result = response.data as ProxyGetSignatureListPadesResultV4;
+    console.log("getSignatureListPadesV4Result", result);
 
     if (result.error !== undefined && result.error !== null && result.error.length > 0) {
       waitString.value = "İmza listesi alınamadı: " + result.error;
-      logs.value.push("GetSignatureListCadesV4 hata: " + result.error);
+      logs.value.push("GetSignatureListPadesV4 hata: " + result.error);
       signatureList.value = null;
     } else {
       signatureList.value = result.signatures;
-      isFileDetached.value = result.isDetached;
-      if (result.isDetached) {
-        logs.value.push("Dosya detached imza içeriyor. Orijinal dosyanın OperationId'si gerekecek.");
-      }
-      waitString.value = "CAdES imza listesi alındı.";
-      logs.value.push("GetSignatureListCadesV4 başarılı.");
+      waitString.value = "PAdES imza listesi alındı.";
+      logs.value.push("GetSignatureListPadesV4 başarılı.");
     }
   } catch (error) {
     const normalizedError = error instanceof Error ? error : new Error(String(error));
     waitString.value = "İmza listesi alınamadı. " + HandleError(normalizedError);
-    logs.value.push("GetSignatureListCadesV4 hata: " + HandleError(normalizedError));
-    console.error("GetSignatureListCadesV4 error", error);
+    logs.value.push("GetSignatureListPadesV4 hata: " + HandleError(normalizedError));
+    console.error("GetSignatureListPadesV4 error", error);
   }
 }
 
@@ -165,39 +154,38 @@ async function GetSignatureListCadesV4() {
 // İMZA UPGRADE
 // ═══════════════════════════════════════════════════════════════
 
-async function UpgradeCadesV4() {
+async function UpgradePadesV4() {
   try {
-    waitString.value = "CAdES imza zenginleştiriliyor.";
-    logs.value.push("UpgradeCadesV4 isteği gönderiliyor.");
+    waitString.value = "PAdES imza zenginleştiriliyor.";
+    logs.value.push("UpgradePadesV4 isteği gönderiliyor.");
 
-    const request: ProxyUpgradeCadesRequestV4 = {
+    const request: ProxyUpgradePadesRequestV4 = {
       operationId: operationIdOfFileUpload.value,
       targetLevel: selectedTargetLevel.value.value,
       signaturePath: signaturePath.value,
-      originalFileOperationId: isFileDetached.value ? originalFileOperationId.value : null,
     };
 
     const response = await axios.post(
-      store.API_URL + "/Onaylarim/UpgradeCadesV4",
+      store.API_URL + "/Onaylarim/UpgradePadesV4",
       request
     );
 
     if (response.data?.error) {
       waitString.value = "Upgrade hata: " + response.data.error;
-      logs.value.push("UpgradeCadesV4 hata: " + response.data.error);
+      logs.value.push("UpgradePadesV4 hata: " + response.data.error);
     } else {
       operationIdOfUpgrade.value = response.data as string;
       isSuccess.value = true;
-      waitString.value = "CAdES imza zenginleştirildi.";
-      logs.value.push("UpgradeCadesV4 başarılı.");
+      waitString.value = "PAdES imza zenginleştirildi.";
+      logs.value.push("UpgradePadesV4 başarılı.");
       // İmza listesini yenile
-      GetSignatureListCadesV4();
+      GetSignatureListPadesV4();
     }
   } catch (error) {
     const normalizedError = error instanceof Error ? error : new Error(String(error));
     waitString.value = "Upgrade hata: " + HandleError(normalizedError);
-    logs.value.push("UpgradeCadesV4 hata: " + HandleError(normalizedError));
-    console.error("UpgradeCadesV4 error", error);
+    logs.value.push("UpgradePadesV4 hata: " + HandleError(normalizedError));
+    console.error("UpgradePadesV4 error", error);
   }
 }
 
@@ -217,7 +205,7 @@ async function DownloadFile() {
       return;
     }
 
-    let filename = "dosya.p7s";
+    let filename = "dosya.pdf";
     const contentDisposition = response.headers["content-disposition"];
     if (contentDisposition) {
       const match = contentDisposition.match(/filename[^;\n]*=(UTF-\d['"]*)?((['"]).*?[.]$\2|[^;\n]*)?/gi);
@@ -245,7 +233,7 @@ async function DownloadFile() {
 
 <template>
   <main class="space-y-4">
-    <CardComponent title="CAdES Upgrade V4">
+    <CardComponent title="PAdES Upgrade V4">
       <template v-slot:icon>
         <ArrowUpOnSquareIcon></ArrowUpOnSquareIcon>
       </template>
@@ -257,10 +245,10 @@ async function DownloadFile() {
 
               <!-- Dosya Seçimi -->
               <div class="mt-2 max-w-sm">
-                <label for="uploadFileUpgradeV4" class="block text-sm/6 font-medium text-gray-900 dark:text-white">Upgrade Edilecek Dosya</label>
+                <label for="uploadFilePadesUpgradeV4" class="block text-sm/6 font-medium text-gray-900 dark:text-white">Upgrade Edilecek PDF Dosya</label>
                 <div class="mt-1 flex items-center gap-3 rounded-md border-0 py-1.5 pl-0 pr-3 text-gray-900">
-                  <input id="uploadFileUpgradeV4" name="uploadFileUpgradeV4" type="file" class="sr-only" @change="onFileSelected" />
-                  <label for="uploadFileUpgradeV4"
+                  <input id="uploadFilePadesUpgradeV4" name="uploadFilePadesUpgradeV4" type="file" accept=".pdf" class="sr-only" @change="onFileSelected" />
+                  <label for="uploadFilePadesUpgradeV4"
                     class="flex-shrink-0 rounded-md bg-yellow-600 px-3 py-1.5 text-sm font-medium text-white cursor-pointer hover:bg-yellow-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-600 focus-visible:ring-offset-2 focus-visible:ring-offset-white">
                     Dosya seç
                   </label>
@@ -270,19 +258,7 @@ async function DownloadFile() {
                 </div>
               </div>
 
-              <!-- Detached dosya uyarısı -->
-              <div v-if="isFileDetached" class="mt-2 max-w-sm p-2 bg-yellow-50 border border-yellow-200 rounded-md">
-                <p class="text-xs text-yellow-800 mb-1">Bu dosya detached imza içeriyor. Upgrade yapabilmek için orijinal dosyanın OperationId'sini giriniz.</p>
-                <div class="flex items-center gap-2">
-                  <input type="text" v-model="originalFileOperationId" autocomplete="off"
-                    class="block w-full rounded-md border-0 py-1 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-yellow-600 sm:text-sm sm:leading-6"
-                    placeholder="Orijinal Dosya OperationId" />
-                  <button type="button" @click="GetSignatureListCadesV4()"
-                    class="flex-shrink-0 rounded-md bg-yellow-100 px-2 py-1 text-xs font-medium text-yellow-800 hover:bg-yellow-200 focus:outline-none focus:ring-2 focus:ring-yellow-600">
-                    Yenile
-                  </button>
-                </div>
-              </div>
+              
 
               <!-- Hedef İmza Seviyesi -->
               <Listbox as="div" v-model="selectedTargetLevel" class="max-w-sm mt-2">
@@ -313,14 +289,14 @@ async function DownloadFile() {
 
               <!-- Upgrade Edilecek İmza Yolu -->
               <div class="mt-2 max-w-sm" v-if="signatureList && signatureList.length > 0">
-                <label for="signaturePathUpgrade" class="block text-sm/6 font-medium text-gray-900 dark:text-white">Upgrade Edilecek İmza</label>
-                <input type="text" name="signaturePathUpgrade" id="signaturePathUpgrade" v-model="signaturePath" autocomplete="off"
+                <label for="signaturePathPadesUpgrade" class="block text-sm/6 font-medium text-gray-900 dark:text-white">Upgrade Edilecek İmza</label>
+                <input type="text" name="signaturePathPadesUpgrade" id="signaturePathPadesUpgrade" v-model="signaturePath" autocomplete="off"
                   class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-yellow-600 sm:text-sm sm:leading-6"
                   placeholder="S0" />
               </div>
 
               <div class="mt-3 max-w-sm">
-                <button type="button" @click="UpgradeCadesV4()" :disabled="!operationIdOfFileUpload"
+                <button type="button" @click="UpgradePadesV4()" :disabled="!operationIdOfFileUpload"
                   class="rounded-md bg-yellow-600 px-2 py-1.5 text-sm font-medium text-white hover:bg-yellow-700 disabled:bg-gray-300 disabled:text-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-800 focus:ring-offset-2 focus:ring-offset-yellow-200">
                   Upgrade Et
                 </button>
@@ -347,7 +323,7 @@ async function DownloadFile() {
               </div>
               <div v-else-if="signatureList === null || signatureList.length === 0">
                 <div class="text-sm text-gray-700 mt-2">
-                  <p>Belgede CAdES türünde imza bulunmuyor.</p>
+                  <p>Belgede PAdES türünde imza bulunmuyor.</p>
                 </div>
               </div>
               <div class="space-y-4 mt-2" v-else>
@@ -360,9 +336,7 @@ async function DownloadFile() {
                   <p class="text-xs text-black"><span class="text-gray-600">İmza Tarihi</span> {{ signature.claimedSigningTimeAsTime ?? signature.claimedSigningTime }}</p>
                   <p class="text-xs text-black" v-if="signature.profileName"><span class="text-gray-600">Profil</span> {{ signature.profileName }}</p>
                   <p class="text-xs text-black" v-if="signature.hashAlgorithm"><span class="text-gray-600">Hash Algoritması</span> {{ signature.hashAlgorithm }}</p>
-                  <p class="text-xs text-black" v-if="signature.parentEntity"><span class="text-gray-600">Üst İmza</span> {{ signature.parentEntity }}</p>
                   <p class="text-xs text-black"><span class="text-gray-600">Uzun Vadeli Bilgi</span> {{ signature.containsLongTermInfo ? "Evet" : "Hayır" }}</p>
-                  <p class="text-xs text-black" v-if="signature.lastArchivalTime"><span class="text-gray-600">Son Arşiv Zamanı</span> {{ signature.lastArchivalTime }}</p>
                   <p class="text-xs text-black" v-if="signature.timestamp"><span class="text-gray-600">Zaman Damgası</span> {{ signature.timestamp.entityLabel }}</p>
                   <p class="text-xs text-black" v-if="signature.timestamp"><span class="text-gray-600">Zaman Damgası Tarihi</span> {{ signature.timestamp.timeAsTime ?? signature.timestamp.time }}</p>
                   <p class="text-xs text-black" v-if="signature.timestamp?.tSAName"><span class="text-gray-600">TSA</span> {{ signature.timestamp.tSAName }}</p>

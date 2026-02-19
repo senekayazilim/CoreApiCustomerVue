@@ -17,6 +17,8 @@ import CadesUpgradeComponentV2 from "./components/CadesUpgradeComponentV2.vue";
 import XadesUpgradeComponentV2 from "./components/XadesUpgradeComponentV2.vue";
 import SignComponentV4 from "./components/SignComponentV4.vue";
 import CadesUpgradeComponentV4 from "./components/CadesUpgradeComponentV4.vue";
+import SignPadesComponentV4 from "./components/SignPadesComponentV4.vue";
+import PadesUpgradeComponentV4 from "./components/PadesUpgradeComponentV4.vue";
 import StatsComponent from "./components/StatsComponent.vue";
 import OperationsComponent from "./components/OperationsComponent.vue";
 
@@ -52,8 +54,10 @@ const navigation: NavItem[] = [
   {
     name: "V4",
     children: [
-      { name: "e-İmza CAdES V4", tag: shallowRef(SignComponentV4) },
+      { name: "CAdES e-İmza V4", tag: shallowRef(SignComponentV4) },
       { name: "CAdES Upgrade V4", tag: shallowRef(CadesUpgradeComponentV4) },
+      { name: "PAdES e-İmza V4", tag: shallowRef(SignPadesComponentV4) },
+      { name: "PAdES Upgrade V4", tag: shallowRef(PadesUpgradeComponentV4) },
     ],
   },
   { name: "İstatistikler", tag: shallowRef(StatsComponent) },
