@@ -84,6 +84,17 @@ function selectItem(item: NavItem) {
 function isSelected(item: NavItem): boolean {
   return selectedItem.value?.name === item.name;
 }
+
+function onNavSelectChange(e: Event) {
+  const name = (e.target as HTMLSelectElement).value;
+  for (const item of navigation) {
+    if (item.tag && item.name === name) { selectItem(item); return; }
+    if (item.children) {
+      const child = item.children.find((c: NavItem) => c.name === name);
+      if (child) { selectItem(child); return; }
+    }
+  }
+}
 </script>
 
 <template>
@@ -102,16 +113,7 @@ function isSelected(item: NavItem): boolean {
         <label for="nav-select" class="sr-only">Sayfa seçin</label>
         <select id="nav-select" name="nav-select"
           class="block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
-          @change="(e: Event) => {
-            const name = (e.target as HTMLSelectElement).value;
-            for (const item of navigation) {
-              if (item.tag && item.name === name) { selectItem(item); return; }
-              if (item.children) {
-                const child = item.children.find(c => c.name === name);
-                if (child) { selectItem(child); return; }
-              }
-            }
-          }">
+          @change="onNavSelectChange">
           <template v-for="item in navigation" :key="item.name">
             <optgroup v-if="item.children" :label="item.name">
               <option v-for="child in item.children" :key="child.name" :selected="isSelected(child)">{{ child.name }}</option>
