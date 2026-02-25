@@ -21,6 +21,8 @@ import SignPadesComponentV4 from "./components/SignPadesComponentV4.vue";
 import PadesUpgradeComponentV4 from "./components/PadesUpgradeComponentV4.vue";
 import SignXadesComponentV4 from "./components/SignXadesComponentV4.vue";
 import XadesUpgradeComponentV4 from "./components/XadesUpgradeComponentV4.vue";
+import MobileSignComponentV4 from "./components/MobileSignComponentV4.vue";
+import VerifyComponentV4 from "./components/VerifyComponentV4.vue";
 import StatsComponent from "./components/StatsComponent.vue";
 import OperationsComponent from "./components/OperationsComponent.vue";
 
@@ -62,6 +64,8 @@ const navigation: NavItem[] = [
       { name: "PAdES Upgrade V4", tag: shallowRef(PadesUpgradeComponentV4) },
       { name: "XAdES e-İmza V4", tag: shallowRef(SignXadesComponentV4) },
       { name: "XAdES Upgrade V4", tag: shallowRef(XadesUpgradeComponentV4) },
+      { name: "Mobil İmza V4", tag: shallowRef(MobileSignComponentV4) },
+      { name: "Doğrulama V4", tag: shallowRef(VerifyComponentV4) },
     ],
   },
   { name: "İstatistikler", tag: shallowRef(StatsComponent) },

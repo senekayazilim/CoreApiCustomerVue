@@ -51,6 +51,7 @@ const isSuccess = ref(false);
 const signatureList = ref(undefined as Array<ProxyXadesSignatureInfoV4> | null | undefined);
 const isFileDetached = ref(false);
 const originalFileOperationId = ref(null as string | null);
+const detachedResourceUri = ref(null as string | null);
 
 // e-İmza aracı durumu
 const localSignerMode = ref("");
@@ -342,6 +343,7 @@ async function SignXadesV4(certificate: CertificateInfo) {
       hashAlgorithm: selectedHashAlgorithm.value.value,
       signatureMode: selectedSignatureMode.value.value,
       originalFileOperationId: isDetachedMode && isFileDetached.value ? originalFileOperationId.value : null,
+      detachedResourceUri: isDetachedMode ? detachedResourceUri.value : null,
       envelopedContentElementId: selectedSignatureMode.value.value === XadesSignatureModeV4.Enveloped ? envelopedContentElementId.value : null,
       envelopingObjectMimeType: selectedSignatureMode.value.value === XadesSignatureModeV4.Enveloping ? envelopingObjectMimeType.value : null,
       envelopingObjectEncoding: selectedSignatureMode.value.value === XadesSignatureModeV4.Enveloping ? envelopingObjectEncoding.value : null,
@@ -585,6 +587,14 @@ function getSignatureTimeLabel(signature: ProxyXadesSignatureInfoV4) {
                         Yenile
                       </button>
                     </div>
+                  </div>
+
+                  <!-- Detached Resource URI (Detached modda) -->
+                  <div class="mt-2 max-w-sm" v-if="selectedSignatureMode.value === 2">
+                    <label for="detachedResourceUri" class="block text-sm/6 font-medium text-gray-900 dark:text-white">Detached Resource URI</label>
+                    <input type="text" name="detachedResourceUri" id="detachedResourceUri" v-model="detachedResourceUri" autocomplete="off"
+                      class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-yellow-600 sm:text-sm sm:leading-6"
+                      placeholder="belge.xml (boş ise dosya adından türetilir)" />
                   </div>
 
                   <!-- İmza Seviyesi -->
