@@ -2,7 +2,7 @@
 import { computed, ref } from "@vue/runtime-core";
 import axios from "axios";
 import { Disclosure, DisclosureButton, DisclosurePanel } from "@headlessui/vue";
-import { ChevronRightIcon } from "@heroicons/vue/20/solid";
+import { ChevronRightIcon, CheckCircleIcon, XCircleIcon, MinusCircleIcon } from "@heroicons/vue/20/solid";
 import { ShieldCheckIcon } from "@heroicons/vue/24/outline";
 import CardComponent from "./CardComponent.vue";
 import {
@@ -36,6 +36,15 @@ const validationResult = ref(null as ProxyJavaValidationResultV4 | null);
 const selectedFile = ref<File | null>(null);
 const selectedFileName = ref("");
 
+// Orijinal dosya seçimi (detached imzalar için)
+const selectedOriginalFile = ref<File | null>(null);
+const selectedOriginalFileName = ref("");
+const operationIdOfOriginalFileUpload = ref("");
+
+const isDetachedSupported = computed(() =>
+  selectedSignatureType.value.id === "cades" || selectedSignatureType.value.id === "xades"
+);
+
 // ═══════════════════════════════════════════════════════════════
 // DROPDOWN SEÇENEKLERİ
 // ═══════════════════════════════════════════════════════════════
@@ -59,6 +68,9 @@ function onFileSelected(event: Event) {
     selectedFileName.value = file.name;
     logs.value.push(`Sunucuya yüklenecek dosya seçildi: ${file.name}`);
     operationIdOfFileUpload.value = "";
+    operationIdOfOriginalFileUpload.value = "";
+    selectedOriginalFile.value = null;
+    selectedOriginalFileName.value = "";
     validationResult.value = null;
     UploadFileToServer();
   } else {
@@ -107,6 +119,63 @@ async function UploadFileToServer() {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// ORİJİNAL DOSYA YÜKLEME (Detached imzalar için)
+// ═══════════════════════════════════════════════════════════════
+
+function onOriginalFileSelected(event: Event) {
+  const target = event.target as HTMLInputElement;
+  if (target?.files && target.files.length > 0) {
+    const file = target.files[0];
+    selectedOriginalFile.value = file;
+    selectedOriginalFileName.value = file.name;
+    logs.value.push(`Orijinal dosya seçildi: ${file.name}`);
+    operationIdOfOriginalFileUpload.value = "";
+    UploadOriginalFileToServer();
+  } else {
+    selectedOriginalFile.value = null;
+    selectedOriginalFileName.value = "";
+  }
+}
+
+async function UploadOriginalFileToServer() {
+  if (!selectedOriginalFile.value) {
+    waitString.value = "Lütfen orijinal dosyayı seçiniz.";
+    return;
+  }
+
+  operationIdOfOriginalFileUpload.value = "";
+
+  const formData = new FormData();
+  formData.append("file", selectedOriginalFile.value);
+  formData.append("filename", selectedOriginalFile.value.name);
+
+  try {
+    waitString.value = "Orijinal dosya sunucuya yükleniyor.";
+    logs.value.push(`Orijinal dosya yükleme isteği gönderiliyor: ${selectedOriginalFile.value.name}`);
+    const response = await axios.post(store.API_URL + "/Onaylarim/UploadFileV2", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+
+    const uploadResult = response.data as ProxyUploadFileResult;
+    if (uploadResult?.isSuccess) {
+      waitString.value = "Orijinal dosya sunucuya başarıyla yüklendi. Doğrulama başlatılabilir.";
+      logs.value.push("Orijinal dosya sunucuya başarıyla yüklendi.");
+      operationIdOfOriginalFileUpload.value = uploadResult.operationId;
+    } else {
+      const errorMessage = uploadResult?.error || "Orijinal dosya yüklemesi başarısız oldu.";
+      waitString.value = errorMessage;
+      logs.value.push(errorMessage);
+    }
+  } catch (error) {
+    const normalizedError = error instanceof Error ? error : new Error(String(error));
+    const errorMessage = HandleError(normalizedError);
+    waitString.value = "Orijinal dosya yüklemesi başarısız oldu. " + errorMessage;
+    logs.value.push("Orijinal dosya yüklemesi başarısız oldu. " + errorMessage);
+    console.error("UploadOriginalFile error", error);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
 // DOĞRULAMA
 // ═══════════════════════════════════════════════════════════════
 
@@ -128,9 +197,14 @@ async function VerifyV4() {
   logs.value.push(`${type.toUpperCase()} doğrulama isteği gönderiliyor.`);
 
   try {
-    const response = await axios.post(store.API_URL + endpoint, {
+    const requestBody: Record<string, string | null> = {
       operationId: operationIdOfFileUpload.value,
-    });
+    };
+    if (type === "cades" || type === "xades") {
+      requestBody.originalFileOperationId = operationIdOfOriginalFileUpload.value || null;
+    }
+
+    const response = await axios.post(store.API_URL + endpoint, requestBody);
 
     const result = response.data as
       ProxyVerifyCadesCoreResultV4 |
@@ -170,6 +244,57 @@ function getValidationResultColor(resultType: string | undefined): string {
   if (lower.includes("valid") && !lower.includes("invalid")) return "text-green-700";
   if (lower.includes("invalid") || lower.includes("error")) return "text-red-700";
   return "text-yellow-700";
+}
+
+function getSummaryLabel(summary: string | undefined): string {
+  if (!summary) return "Bilinmiyor";
+  if (summary === "ALL_VALID") return "Tüm İmzalar Geçerli";
+  if (summary === "CONTAINS_INVALID") return "Geçersiz İmza İçeriyor";
+  if (summary === "CONTAINS_INCOMPLETE") return "Eksik İmza İçeriyor";
+  return summary;
+}
+
+interface ParsedCheck {
+  status: "pass" | "fail" | "info";
+  title: string;
+  detail: string;
+}
+
+function parseCheckText(text: string | null | undefined): { header: string; checks: ParsedCheck[] } {
+  if (!text) return { header: "", checks: [] };
+
+  const lines = text.split("\n");
+  const headerLines: string[] = [];
+  const checks: ParsedCheck[] = [];
+  let currentCheck: ParsedCheck | null = null;
+
+  for (const line of lines) {
+    const trimmed = line.replace(/\r/g, "").trim();
+    if (!trimmed) continue;
+
+    const passMatch = trimmed.match(/^\(\+\)\s*(.+)/);
+    const failMatch = trimmed.match(/^\(-\)\s*(.+)/);
+    const infoMatch = trimmed.match(/^\[-\]\s*(.+)/);
+
+    if (passMatch) {
+      if (currentCheck) checks.push(currentCheck);
+      currentCheck = { status: "pass", title: passMatch[1], detail: "" };
+    } else if (failMatch) {
+      if (currentCheck) checks.push(currentCheck);
+      currentCheck = { status: "fail", title: failMatch[1], detail: "" };
+    } else if (infoMatch) {
+      if (currentCheck) checks.push(currentCheck);
+      currentCheck = { status: "info", title: infoMatch[1], detail: "" };
+    } else if (currentCheck) {
+      currentCheck.detail = currentCheck.detail ? currentCheck.detail + " " + trimmed : trimmed;
+    } else {
+      headerLines.push(trimmed);
+    }
+  }
+
+  if (currentCheck) checks.push(currentCheck);
+
+  return { header: headerLines.join("\n"), checks };
 }
 </script>
 
@@ -216,6 +341,21 @@ function getValidationResultColor(resultType: string | undefined): string {
                 </div>
               </div>
 
+              <!-- Orijinal Dosya Seçimi (Detached imzalar için) -->
+              <div class="mt-2 max-w-sm" v-if="isDetachedSupported">
+                <label for="uploadOriginalFileVerifyV4" class="block text-sm/6 font-medium text-gray-900 dark:text-white">Orijinal Dosya <span class="font-normal text-gray-500">(Detached imza ise)</span></label>
+                <div class="mt-1 flex items-center gap-3 rounded-md border-0 py-1.5 pl-0 pr-3 text-gray-900">
+                  <input id="uploadOriginalFileVerifyV4" name="uploadOriginalFileVerifyV4" type="file" class="sr-only" @change="onOriginalFileSelected" />
+                  <label for="uploadOriginalFileVerifyV4"
+                    class="flex-shrink-0 rounded-md bg-gray-500 px-3 py-1.5 text-sm font-medium text-white cursor-pointer hover:bg-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white">
+                    Dosya seç
+                  </label>
+                  <span class="text-sm text-gray-500 truncate" :class="{ 'text-gray-400': !selectedOriginalFileName }">
+                    {{ selectedOriginalFileName || "Seçili dosya yok" }}
+                  </span>
+                </div>
+              </div>
+
               <!-- Doğrula Butonu -->
               <div class="mt-3 max-w-sm">
                 <button type="button" @click="VerifyV4()" :disabled="!operationIdOfFileUpload"
@@ -245,7 +385,7 @@ function getValidationResultColor(resultType: string | undefined): string {
                 <!-- Özet Badge -->
                 <div class="mb-3">
                   <span :class="[getSummaryColor(validationResult.summary), 'inline-flex items-center rounded-md px-2 py-1 text-xs font-medium']">
-                    {{ validationResult.summary }}
+                    {{ getSummaryLabel(validationResult.summary) }}
                   </span>
                 </div>
 
@@ -254,55 +394,168 @@ function getValidationResultColor(resultType: string | undefined): string {
                   <Disclosure as="div" v-for="(sig, index) in validationResult.signatureValidations" :key="index" v-slot="{ open }" :default-open="index === 0">
                     <DisclosureButton class="flex w-full items-center gap-x-2 rounded-md p-2 text-left text-sm font-medium bg-white border border-gray-200 hover:bg-gray-50">
                       <ChevronRightIcon :class="[open ? 'rotate-90 text-gray-500' : 'text-gray-400', 'h-5 w-5 shrink-0 transition-transform']" aria-hidden="true" />
+                      <CheckCircleIcon v-if="sig.validationResultType === 'VALID'" class="h-5 w-5 text-green-500 shrink-0" />
+                      <XCircleIcon v-else-if="sig.validationResultType === 'INVALID'" class="h-5 w-5 text-red-500 shrink-0" />
+                      <MinusCircleIcon v-else class="h-5 w-5 text-yellow-500 shrink-0" />
                       <span class="flex-1 truncate">{{ sig.signerFullName || 'İmza ' + (index + 1) }}</span>
-                      <span :class="[getValidationResultColor(sig.validationResultType), 'text-xs font-medium']">{{ sig.validationResult }}</span>
+                      <span v-if="sig.signatureFormat" class="text-xs text-gray-400 font-normal">{{ sig.signatureFormat }}</span>
+                      <span :class="[getValidationResultColor(sig.validationResultType), 'text-xs font-medium']">{{ sig.validationResultType }}</span>
                     </DisclosureButton>
-                    <DisclosurePanel class="mt-1 ml-7 space-y-1 text-xs">
-                      <p class="text-black" v-if="sig.signerFullName"><span class="text-gray-600">İmzacı</span> {{ sig.signerFullName }}</p>
-                      <p class="text-black" v-if="sig.serialNumber"><span class="text-gray-600">Seri No</span> {{ sig.serialNumber }}</p>
-                      <p class="text-black" v-if="sig.signatureType"><span class="text-gray-600">İmza Tipi</span> {{ sig.signatureType }}</p>
-                      <p class="text-black" v-if="sig.signatureFormat"><span class="text-gray-600">Format</span> {{ sig.signatureFormat }}</p>
-                      <p class="text-black" v-if="sig.signatureAlg"><span class="text-gray-600">Algoritma</span> {{ sig.signatureAlg }}</p>
-                      <p class="text-black" v-if="sig.signingTime"><span class="text-gray-600">İmza Zamanı</span> {{ sig.signingTime }}</p>
-                      <p class="text-black" v-if="sig.signingTimeDeclared"><span class="text-gray-600">Beyan Edilen Zaman</span> {{ sig.signingTimeDeclared }}</p>
-                      <p class="text-black" v-if="sig.policyTurkishESigProfile"><span class="text-gray-600">Profil</span> {{ sig.policyTurkishESigProfile }}</p>
-                      <p class="text-black" v-if="sig.policyId"><span class="text-gray-600">Policy ID</span> {{ sig.policyId }}</p>
-                      <p class="text-black" v-if="sig.policyUri"><span class="text-gray-600">Policy URI</span> {{ sig.policyUri }}</p>
-                      <p class="text-black" v-if="sig.policyDigestAlgorithm"><span class="text-gray-600">Policy Digest</span> {{ sig.policyDigestAlgorithm }}</p>
-                      <p class="text-black" v-if="sig.policyUserNotice"><span class="text-gray-600">Policy Notice</span> {{ sig.policyUserNotice }}</p>
+                    <DisclosurePanel class="mt-1 ml-7 text-xs">
+                      <!-- Temel Bilgiler -->
+                      <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 mt-1">
+                        <template v-if="sig.signerFullName">
+                          <dt class="text-gray-500">İmzacı</dt>
+                          <dd class="text-gray-900 font-medium">{{ sig.signerFullName }}</dd>
+                        </template>
+                        <template v-if="sig.serialNumber">
+                          <dt class="text-gray-500">Seri No</dt>
+                          <dd class="text-gray-900 font-mono">{{ sig.serialNumber }}</dd>
+                        </template>
+                        <template v-if="sig.signatureType">
+                          <dt class="text-gray-500">İmza Tipi</dt>
+                          <dd class="text-gray-900">{{ sig.signatureType }}</dd>
+                        </template>
+                        <template v-if="sig.signatureFormat">
+                          <dt class="text-gray-500">Format</dt>
+                          <dd class="text-gray-900">{{ sig.signatureFormat }}</dd>
+                        </template>
+                        <template v-if="sig.signatureAlg">
+                          <dt class="text-gray-500">Algoritma</dt>
+                          <dd class="text-gray-900">{{ sig.signatureAlg }}</dd>
+                        </template>
+                        <template v-if="sig.signingTime">
+                          <dt class="text-gray-500">İmza Zamanı</dt>
+                          <dd class="text-gray-900">{{ sig.signingTime }}</dd>
+                        </template>
+                        <template v-if="sig.signingTimeDeclared">
+                          <dt class="text-gray-500">Beyan Edilen Zaman</dt>
+                          <dd class="text-gray-900">{{ sig.signingTimeDeclared }}</dd>
+                        </template>
+                        <template v-if="sig.policyTurkishESigProfile">
+                          <dt class="text-gray-500">Profil</dt>
+                          <dd class="text-gray-900">{{ sig.policyTurkishESigProfile }}</dd>
+                        </template>
+                        <template v-if="sig.policyId">
+                          <dt class="text-gray-500">Policy ID</dt>
+                          <dd class="text-gray-900 font-mono break-all">{{ sig.policyId }}</dd>
+                        </template>
+                        <template v-if="sig.policyUri">
+                          <dt class="text-gray-500">Policy URI</dt>
+                          <dd class="text-gray-900 font-mono break-all">{{ sig.policyUri }}</dd>
+                        </template>
+                        <template v-if="sig.policyDigestAlgorithm">
+                          <dt class="text-gray-500">Policy Digest</dt>
+                          <dd class="text-gray-900">{{ sig.policyDigestAlgorithm }}</dd>
+                        </template>
+                        <template v-if="sig.policyUserNotice">
+                          <dt class="text-gray-500">Policy Notice</dt>
+                          <dd class="text-gray-900">{{ sig.policyUserNotice }}</dd>
+                        </template>
+                        <template v-if="sig.validationCertificateStatusInfotCertificateStatus">
+                          <dt class="text-gray-500">Sertifika Durumu</dt>
+                          <dd :class="getValidationResultColor(sig.validationCertificateStatusInfotCertificateStatus)" class="font-medium">{{ sig.validationCertificateStatusInfotCertificateStatus }}</dd>
+                        </template>
+                      </dl>
 
-                      <!-- Timestamp -->
-                      <div v-if="sig.hasTimestamp && sig.timestamp" class="mt-1 pl-2 border-l-2 border-gray-300">
-                        <p class="text-black"><span class="text-gray-600">ZD Tipi</span> {{ sig.timestamp.timestampType }}</p>
-                        <p class="text-black"><span class="text-gray-600">ZD Tarihi</span> {{ sig.timestamp.dateOfTimestmap }}</p>
+                      <!-- Zaman Damgası -->
+                      <div v-if="sig.hasTimestamp && sig.timestamp" class="mt-3 pl-3 border-l-2 border-gray-300">
+                        <p class="font-medium text-gray-700 mb-1">Zaman Damgası</p>
+                        <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5">
+                          <dt class="text-gray-500">Tip</dt>
+                          <dd class="text-gray-900">{{ sig.timestamp.timestampType }}</dd>
+                          <dt class="text-gray-500">Tarih</dt>
+                          <dd class="text-gray-900">{{ sig.timestamp.dateOfTimestmap }}</dd>
+                        </dl>
                       </div>
 
-                      <!-- Doğrulama Detayları -->
-                      <p class="text-black" v-if="sig.validationResult"><span class="text-gray-600">Sonuç</span> <span :class="getValidationResultColor(sig.validationResultType)">{{ sig.validationResult }}</span></p>
-                      <p class="text-black" v-if="sig.validationResultType"><span class="text-gray-600">Sonuç Tipi</span> {{ sig.validationResultType }}</p>
-                      <p class="text-black" v-if="sig.validationCertificateStatusInfotCertificateStatus"><span class="text-gray-600">Sertifika Durumu</span> {{ sig.validationCertificateStatusInfotCertificateStatus }}</p>
-                      <p class="text-black" v-if="sig.validationCertificateStatusInfoCheckResultsToString"><span class="text-gray-600">Kontrol Sonuçları</span> {{ sig.validationCertificateStatusInfoCheckResultsToString }}</p>
+                      <!-- İmza Doğrulama Kontrolleri -->
+                      <div v-if="sig.validationResult" class="mt-3">
+                        <p class="font-medium text-gray-700 mb-1.5">İmza Doğrulama Kontrolleri</p>
+                        <p v-if="parseCheckText(sig.validationResult).header" class="text-gray-600 mb-1.5">
+                          {{ parseCheckText(sig.validationResult).header }}
+                        </p>
+                        <div class="space-y-1">
+                          <div v-for="(check, ci) in parseCheckText(sig.validationResult).checks" :key="ci" class="flex items-start gap-1.5">
+                            <CheckCircleIcon v-if="check.status === 'pass'" class="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
+                            <XCircleIcon v-else-if="check.status === 'fail'" class="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+                            <MinusCircleIcon v-else class="h-4 w-4 text-blue-400 shrink-0 mt-0.5" />
+                            <div>
+                              <span class="font-medium text-gray-800">{{ check.title }}</span>
+                              <p v-if="check.detail" class="text-gray-500">{{ check.detail }}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- İptal Durumu Kontrolleri -->
+                      <div v-if="sig.validationCertificateStatusInfoCheckResultsToString" class="mt-3">
+                        <p class="font-medium text-gray-700 mb-1.5">İptal Durumu Kontrolleri</p>
+                        <div class="space-y-1">
+                          <div v-for="(check, ci) in parseCheckText(sig.validationCertificateStatusInfoCheckResultsToString).checks" :key="ci" class="flex items-start gap-1.5">
+                            <CheckCircleIcon v-if="check.status === 'pass'" class="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
+                            <XCircleIcon v-else-if="check.status === 'fail'" class="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+                            <MinusCircleIcon v-else class="h-4 w-4 text-blue-400 shrink-0 mt-0.5" />
+                            <div>
+                              <span class="font-medium text-gray-800">{{ check.title }}</span>
+                              <p v-if="check.detail" class="text-gray-500">{{ check.detail }}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
 
                       <!-- Detaylı Bilgiler (genişletilebilir) -->
-                      <Disclosure as="div" v-if="sig.validationCertificateStatusInfoDetailedMessage || sig.validationCertificateStatusInfoDetailedValidationReport || sig.validationCertificateStatusInfoValidationHistory" v-slot="{ open: detailOpen }">
-                        <DisclosureButton class="flex items-center gap-x-1 text-xs text-gray-500 hover:text-gray-700 mt-1">
+                      <Disclosure as="div" v-if="sig.validationCertificateStatusInfoDetailedMessage || sig.validationCertificateStatusInfoDetailedValidationReport || sig.validationCertificateStatusInfoValidationHistory || sig.validationCertificateStatusInfoCheckResults" v-slot="{ open: detailOpen }" class="mt-3">
+                        <DisclosureButton class="flex items-center gap-x-1 text-xs text-gray-500 hover:text-gray-700">
                           <ChevronRightIcon :class="[detailOpen ? 'rotate-90' : '', 'h-4 w-4 transition-transform']" aria-hidden="true" />
                           Detaylı Rapor
                         </DisclosureButton>
-                        <DisclosurePanel class="mt-1 ml-4 space-y-1">
-                          <p class="text-black whitespace-pre-wrap break-all" v-if="sig.validationCertificateStatusInfoDetailedMessage"><span class="text-gray-600">Detaylı Mesaj</span><br/>{{ sig.validationCertificateStatusInfoDetailedMessage }}</p>
-                          <p class="text-black whitespace-pre-wrap break-all" v-if="sig.validationCertificateStatusInfoDetailedValidationReport"><span class="text-gray-600">Doğrulama Raporu</span><br/>{{ sig.validationCertificateStatusInfoDetailedValidationReport }}</p>
-                          <p class="text-black whitespace-pre-wrap break-all" v-if="sig.validationCertificateStatusInfoValidationHistory"><span class="text-gray-600">Doğrulama Geçmişi</span><br/>{{ sig.validationCertificateStatusInfoValidationHistory }}</p>
+                        <DisclosurePanel class="mt-1 ml-4 space-y-2">
+                          <div v-if="sig.validationCertificateStatusInfoDetailedMessage">
+                            <p class="text-gray-600 font-medium mb-0.5">Detaylı Mesaj</p>
+                            <p class="text-gray-900 bg-white rounded p-2 border border-gray-200">{{ sig.validationCertificateStatusInfoDetailedMessage }}</p>
+                          </div>
+                          <div v-if="sig.validationCertificateStatusInfoCheckResults">
+                            <p class="text-gray-600 font-medium mb-0.5">Sertifika Kontrolleri</p>
+                            <div class="bg-white rounded p-2 border border-gray-200 space-y-1">
+                              <div v-for="(check, ci) in parseCheckText(sig.validationCertificateStatusInfoCheckResults).checks" :key="ci" class="flex items-start gap-1.5">
+                                <MinusCircleIcon class="h-4 w-4 text-blue-400 shrink-0 mt-0.5" />
+                                <div>
+                                  <span class="font-medium text-gray-800">{{ check.title }}</span>
+                                  <p v-if="check.detail" class="text-gray-500">{{ check.detail }}</p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          <div v-if="sig.validationCertificateStatusInfoDetailedValidationReport">
+                            <p class="text-gray-600 font-medium mb-0.5">Doğrulama Raporu</p>
+                            <pre class="text-gray-900 whitespace-pre-wrap break-all bg-white rounded p-2 border border-gray-200 text-xs max-h-64 overflow-y-auto">{{ sig.validationCertificateStatusInfoDetailedValidationReport }}</pre>
+                          </div>
+                          <div v-if="sig.validationCertificateStatusInfoValidationHistory">
+                            <p class="text-gray-600 font-medium mb-0.5">Doğrulama Geçmişi</p>
+                            <p class="text-gray-900 bg-white rounded p-2 border border-gray-200">{{ sig.validationCertificateStatusInfoValidationHistory }}</p>
+                          </div>
                         </DisclosurePanel>
                       </Disclosure>
 
-                      <!-- Counter Signatures (Recursive) -->
-                      <div v-if="sig.counterSignatureValidations && sig.counterSignatureValidations.length > 0" class="mt-2 pl-2 border-l-2 border-yellow-300">
-                        <p class="text-xs font-medium text-gray-700 mb-1">Counter İmzalar</p>
+                      <!-- Counter Signatures -->
+                      <div v-if="sig.counterSignatureValidations && sig.counterSignatureValidations.length > 0" class="mt-3 pl-3 border-l-2 border-yellow-300">
+                        <p class="font-medium text-gray-700 mb-1">Counter İmzalar</p>
                         <div v-for="(counterSig, cIndex) in sig.counterSignatureValidations" :key="cIndex" class="mb-2">
-                          <p class="text-black" v-if="counterSig.signerFullName"><span class="text-gray-600">İmzacı</span> {{ counterSig.signerFullName }}</p>
-                          <p class="text-black" v-if="counterSig.signatureType"><span class="text-gray-600">Tip</span> {{ counterSig.signatureType }}</p>
-                          <p class="text-black" v-if="counterSig.validationResult"><span class="text-gray-600">Sonuç</span> <span :class="getValidationResultColor(counterSig.validationResultType)">{{ counterSig.validationResult }}</span></p>
+                          <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5">
+                            <template v-if="counterSig.signerFullName">
+                              <dt class="text-gray-500">İmzacı</dt>
+                              <dd class="text-gray-900">{{ counterSig.signerFullName }}</dd>
+                            </template>
+                            <template v-if="counterSig.signatureType">
+                              <dt class="text-gray-500">Tip</dt>
+                              <dd class="text-gray-900">{{ counterSig.signatureType }}</dd>
+                            </template>
+                            <template v-if="counterSig.validationResultType">
+                              <dt class="text-gray-500">Sonuç</dt>
+                              <dd :class="getValidationResultColor(counterSig.validationResultType)">{{ counterSig.validationResultType }}</dd>
+                            </template>
+                          </dl>
                         </div>
                       </div>
                     </DisclosurePanel>
