@@ -4,15 +4,23 @@ import { Cog6ToothIcon } from "@heroicons/vue/24/outline";
 import CardComponent from "./CardComponent.vue";
 import store from "@/types/Store";
 
-// baplanılacak API URL
-const url = ref("");
+const apiOptions = [
+  { id: "local", label: "Localhost (Debug)", url: "https://localhost:7294" },
+  { id: "prod", label: "Production", url: "https://primeapicustomerapi.onaylarim.com" },
+];
+
+const selectedOption = ref(apiOptions[0].id);
 
 onMounted(() => {
-    url.value = store.API_URL;
+  const match = apiOptions.find(o => o.url === store.API_URL);
+  selectedOption.value = match ? match.id : apiOptions[0].id;
 });
 
 function Save() {
-    store.API_URL = url.value;
+  const option = apiOptions.find(o => o.id === selectedOption.value);
+  if (option) {
+    store.API_URL = option.url;
+  }
 }
 </script>
 
@@ -24,16 +32,23 @@ function Save() {
             </template>
             <template v-slot:content>
                 <div class="flex items-end">
-                    <div class="">
+                    <div>
                         <div class="text-sm text-gray-700">
-                            <p>Müşterinin procy servis adresini giriniz. Sonunda bölme işareti olmadan.</p>
+                            <p>Proxy servis adresini seçiniz.</p>
                         </div>
-                        <div class="flex flex-col mt-2">
-                            <div class="mt-2 max-w-sm">
-                                <input type="text" name="url" id="url" v-model="url"
-                                    class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-yellow-600 sm:text-sm sm:leading-6"
-                                    placeholder="5339992200" />
-                            </div>
+                        <div class="mt-3">
+                            <fieldset>
+                                <div class="space-y-2">
+                                    <div v-for="option in apiOptions" :key="option.id" class="flex items-center">
+                                        <input :id="'api_' + option.id" name="apiUrl" type="radio" :value="option.id" v-model="selectedOption"
+                                            class="h-4 w-4 border-gray-300 text-yellow-600 focus:ring-yellow-600 cursor-pointer" />
+                                        <label :for="'api_' + option.id" class="ml-3 cursor-pointer">
+                                            <span class="block text-sm font-medium text-gray-900">{{ option.label }}</span>
+                                            <span class="block text-xs text-gray-500 font-mono">{{ option.url }}</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </fieldset>
                         </div>
                     </div>
                     <div class="flex-grow"></div>
