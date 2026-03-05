@@ -104,7 +104,7 @@ const signatureWidgetInfo = ref<ProxySignatureWidgetInfo>({
   top: 0.1,
   bottom: 0.2,
   transformOrigin: "",
-  imageBytes: [],
+  imageBytes: null,
   pagesToPlaceOn: [1],
   lines: [
     {
