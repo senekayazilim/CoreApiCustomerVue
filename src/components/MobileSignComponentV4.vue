@@ -20,6 +20,7 @@ import {
   type ProxySignStepOneCoreForXadesMobileResultV4,
   type ProxyUploadFileResult,
   type ProxyGetFingerPrintRequest,
+  type ProxySignatureWidgetInfo,
 } from "@/types/Types";
 import { HandleError } from "@/types/HandleError";
 import store from "@/types/Store";
@@ -50,6 +51,33 @@ const userPrompt = ref("Lütfen imzalayınız.");
 
 // İmza yolu
 const signaturePath = ref(null as string | null);
+
+// Görsel imza
+const useVisibleSignature = ref(false);
+const signatureWidgetInfo = ref<ProxySignatureWidgetInfo>({
+  width: 200,
+  height: 50,
+  left: 0.1,
+  right: 0.5,
+  top: 0.1,
+  bottom: 0.2,
+  transformOrigin: "",
+  imageBytes: null,
+  pagesToPlaceOn: [1],
+  lines: [
+    {
+      text: "İmzalandı",
+      leftMargin: 2,
+      topMargin: 2,
+      bottomMargin: 2,
+      rightMargin: 2,
+      fontName: "Arial",
+      fontSize: 10,
+      fontStyle: "Regular",
+      colorHtml: "#000000",
+    },
+  ],
+});
 
 // ═══════════════════════════════════════════════════════════════
 // DROPDOWN SEÇENEKLERİ
@@ -218,6 +246,7 @@ async function MobileSignV4() {
       citizenshipNo: citizenshipNo.value || null,
       signatureLevel: selectedPadesSignatureLevel.value.value,
       profile: selectedPadesProfile.value.value,
+      signatureWidgetInfo: useVisibleSignature.value ? signatureWidgetInfo.value : null,
     } as ProxySignStepOnePadesMobileCoreRequestV4;
   } else {
     endpoint = "/Onaylarim/MobileSignXadesV4";
@@ -460,6 +489,77 @@ async function DownloadFile() {
                   </transition>
                 </div>
               </Listbox>
+
+              <!-- Görsel İmza (sadece PAdES) -->
+              <div class="mt-3 max-w-sm" v-if="selectedSignatureType.id === 'pades'">
+                <div class="flex items-center">
+                  <input id="useVisibleSignatureMobile" name="useVisibleSignatureMobile" type="checkbox" v-model="useVisibleSignature"
+                    class="h-4 w-4 rounded border-gray-300 text-yellow-600 focus:ring-yellow-600 cursor-pointer" />
+                  <label for="useVisibleSignatureMobile" class="ml-3 block text-sm font-medium leading-6 text-gray-900 cursor-pointer">Görsel İmza</label>
+                </div>
+              </div>
+
+              <!-- Görsel İmza Ayarları -->
+              <div v-if="useVisibleSignature && selectedSignatureType.id === 'pades'" class="mt-2 max-w-sm p-3 bg-gray-50 border border-gray-200 rounded-md space-y-2">
+                <p class="text-xs font-medium text-gray-700">Görsel İmza Ayarları</p>
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="block text-xs text-gray-600">Genişlik (px)</label>
+                    <input type="number" v-model.number="signatureWidgetInfo.width"
+                      class="block w-full rounded-md border-0 py-1 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-yellow-600 sm:text-xs sm:leading-6" />
+                  </div>
+                  <div>
+                    <label class="block text-xs text-gray-600">Yükseklik (px)</label>
+                    <input type="number" v-model.number="signatureWidgetInfo.height"
+                      class="block w-full rounded-md border-0 py-1 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-yellow-600 sm:text-xs sm:leading-6" />
+                  </div>
+                  <div>
+                    <label class="block text-xs text-gray-600">Sol (oran)</label>
+                    <input type="number" step="0.01" v-model.number="signatureWidgetInfo.left"
+                      class="block w-full rounded-md border-0 py-1 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-yellow-600 sm:text-xs sm:leading-6" />
+                  </div>
+                  <div>
+                    <label class="block text-xs text-gray-600">Sağ (oran)</label>
+                    <input type="number" step="0.01" v-model.number="signatureWidgetInfo.right"
+                      class="block w-full rounded-md border-0 py-1 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-yellow-600 sm:text-xs sm:leading-6" />
+                  </div>
+                  <div>
+                    <label class="block text-xs text-gray-600">Üst (oran)</label>
+                    <input type="number" step="0.01" v-model.number="signatureWidgetInfo.top"
+                      class="block w-full rounded-md border-0 py-1 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-yellow-600 sm:text-xs sm:leading-6" />
+                  </div>
+                  <div>
+                    <label class="block text-xs text-gray-600">Alt (oran)</label>
+                    <input type="number" step="0.01" v-model.number="signatureWidgetInfo.bottom"
+                      class="block w-full rounded-md border-0 py-1 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-yellow-600 sm:text-xs sm:leading-6" />
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-600">Sayfa Numaraları (virgülle ayırın)</label>
+                  <input type="text" :value="signatureWidgetInfo.pagesToPlaceOn.join(',')"
+                    @input="signatureWidgetInfo.pagesToPlaceOn = ($event.target as HTMLInputElement).value.split(',').filter(s => s.trim()).map(Number)"
+                    class="block w-full rounded-md border-0 py-1 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-yellow-600 sm:text-xs sm:leading-6"
+                    placeholder="1" />
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-600">İmza Metni</label>
+                  <input type="text" v-model="signatureWidgetInfo.lines[0].text"
+                    class="block w-full rounded-md border-0 py-1 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-yellow-600 sm:text-xs sm:leading-6"
+                    placeholder="İmzalandı" />
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="block text-xs text-gray-600">Font</label>
+                    <input type="text" v-model="signatureWidgetInfo.lines[0].fontName"
+                      class="block w-full rounded-md border-0 py-1 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-yellow-600 sm:text-xs sm:leading-6" />
+                  </div>
+                  <div>
+                    <label class="block text-xs text-gray-600">Font Boyutu</label>
+                    <input type="number" v-model.number="signatureWidgetInfo.lines[0].fontSize"
+                      class="block w-full rounded-md border-0 py-1 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-yellow-600 sm:text-xs sm:leading-6" />
+                  </div>
+                </div>
+              </div>
 
               <!-- XAdES İmza Seviyesi -->
               <Listbox as="div" v-model="selectedXadesSignatureLevel" class="max-w-sm mt-2" v-if="selectedSignatureType.id === 'xades'">
