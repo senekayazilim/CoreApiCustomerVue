@@ -129,4 +129,9 @@ npm run dev
 
 ```sh
 npm run build
+
+
+https://seneka.com.tr
+
+https://seneka.com.tr/primeapi
 ```
